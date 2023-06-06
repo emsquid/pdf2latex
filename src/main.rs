@@ -16,6 +16,10 @@ fn pdf_to_images(path: &str, password: Option<&str>) -> Result<Vec<DynamicImage>
 }
 
 fn main() {
-    let images = pdf_to_images("test/test_2_toLatex.pdf", None).expect("Error");
-    println!("{}", images.len())
+    let images = pdf_to_images("test/test_1_toLatex.pdf", None).expect("Error");
+    images
+        .get(0)
+        .unwrap()
+        .save("test/test_1_toLatex.png")
+        .unwrap();
 }
