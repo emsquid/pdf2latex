@@ -31,10 +31,15 @@ class Page:
 
     def grayscaled(self) -> Page:
         return Page(ImageOps.grayscale(self.image))
-    def show_threshold(self):
-        arr = self.grayscaled().array
+    def grayscaledTHRESHOLD(self):
         tr = LETTER_THRESHOLD
-        Page.from_array(ne.evaluate("where(arr <= tr, 0, 255)")).show()
+        arr = self.grayscaled().array
+        return Page.from_array(ne.evaluate("where(arr <= tr, 0, 255)"))
+    def rgb_array(self) -> np.ndarray:
+        if len(self.array.shape) == 3:
+            return self.array.copy()
+        else:
+            return np.dstack((self.array, self.array, self.array))
 
     def set_lines(self):
         self.lines = []
@@ -53,7 +58,7 @@ class Page:
         if self.lines == None:
             self.set_lines()
         
-        parsed = self.array.copy()
+        parsed = self.rgb_array()
         for line in self.lines:
             parsed[line.top] = [[0, 255, 0] for _ in range(self.width)]
             parsed[line.bottom] = [[255, 0, 0] for _ in range(self.width)]
@@ -64,7 +69,7 @@ class Page:
         for line in self.lines:
             line.set_words(self.grayscaled().array)
         
-        parsed = self.array.copy()
+        parsed = self.rgb_array()
         for line in self.lines:
             for word in line.words:
                 parsed[line.top][word.left: word.right] = [0, 255, 0]
@@ -75,21 +80,29 @@ class Page:
             self.set_lines()
         
         for line in self.lines:
-            line.set_letters(self.grayscaled().array)
+            line.set_letters(self.grayscaledTHRESHOLD().array)
         # self.lines[0].set_letters(self.grayscaled().array)
         # self.lines = [self.lines[0]]
         
-        parsed = self.array.copy()
+        parsed = self.rgb_array()
         for line in self.lines:
             for word in line.words:
-                parsed[line.top, word.left: word.right] = [0, 255, 0]
+                parsed[line.top - 1, word.left: word.right] = [0, 255, 0]
                 parsed[line.bottom, word.left: word.right] = [255, 0, 0]
 
                 alternate: bool = False
+                temp = -1
                 for letter in word.letters:
+                    if letter.left == temp:
+                        parsed[line.bottom + 5: line.bottom + 7, letter.left: letter.right] = [255, 0, 0]
+                    temp = letter.right
+
                     parsed[line.bottom: line.bottom + 5, letter.left: letter.right, 2] -= 25 if alternate else 75
+                    # parsed[line.top + letter.pixels[0][1], letter.pixels[0][0]] = [255, 0, 0]
+                    # for pixel in letter.pixels[1:]:
+                    #     parsed[line.top + pixel[1], pixel[0]] = [0, 0, 255] if alternate else [0, 0, 150]
                     alternate = not(alternate)
-        return Page.from_array(np.array(parsed)).show()
+        return Page.from_array(parsed.astype(np.uint8)).show()
     def show_columns(self):
         parsed = self.array.transpose(1, 0, 2)
         for j, column in enumerate(self.grayscaled().array.transpose()):
