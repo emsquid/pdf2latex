@@ -5,12 +5,14 @@ from PIL import Image, ImageOps
 from pdf2image import convert_from_path
 
 LETTER_SPACE: int = 4
-LETTER_THRESHOLD: int = 240
+LETTER_THRESHOLD: int = 180
 
 class Letter:
     # ========================================
     left: int
     right: int
+
+    pixels: list[tuple[int, int]]
     # ========================================
     
     def __init__(self, left: int, right: int):
@@ -19,45 +21,27 @@ class Letter:
         
     
     @staticmethod
-    def flood_fill_right(x_pos: int, y_pos: int, y_min: int, y_max: int, array: np.ndarray) -> tuple[int, int]:
+    def flood_fill(x_pos: int, y_pos: int, array: np.ndarray) -> tuple[int, int, list[tuple[int, int]]]:
         list_pos: list[tuple(int, int)] = [(x_pos, y_pos)]
-        row_empty: bool = False
+        last_index: int = 0
 
-        y_pos = y_max - 1
         left: int = x_pos
         right: int = x_pos
 
-        positiveStep: bool = False
+        while last_index < len(list_pos):
+            for x_, y_ in [(x, y) for x in range(-1, 2) for y in range(-1, 2) if (x != 0 or y != 0)]:
+                x_pos = list_pos[last_index][0] + x_
+                y_pos = list_pos[last_index][1] + y_
+                if x_pos < 0 or x_pos >= len(array) or y_pos < 0 or y_pos >= len(array[0]):
+                    continue
 
-        while not(row_empty) or y_pos < y_max or not(positiveStep):
-            if y_pos >= y_max and positiveStep:
-                y_pos = y_max - 1
-                x_pos += 1
-                row_empty = True
-                positiveStep = False
-            elif y_pos <= y_min and not(positiveStep):
-                y_pos = y_min
-                positiveStep = True
-            
-            if array[x_pos, y_pos] <= LETTER_THRESHOLD:
-                connected: bool = (
-                       (x_pos, y_pos + 1)     in list_pos
-                    or (x_pos, y_pos - 1)     in list_pos
-                    or (x_pos + 1, y_pos)     in list_pos
-                    or (x_pos - 1, y_pos)     in list_pos
-                    or (x_pos + 1, y_pos + 1) in list_pos
-                    or (x_pos - 1, y_pos + 1) in list_pos 
-                    or (x_pos + 1, y_pos - 1) in list_pos
-                    or (x_pos - 1, y_pos - 1) in list_pos)
-
-                if connected:
-                    row_empty = False
+                if array[x_pos, y_pos] <= LETTER_THRESHOLD and (x_pos, y_pos) not in list_pos:
                     list_pos.append((x_pos, y_pos))
                     right = max(right, x_pos)
             
-            y_pos += 1 if positiveStep else -1
-
-        return left, right
+            last_index += 1
+        
+        return left, right, list_pos
 
 class Word:
     # ========================================
@@ -76,19 +60,17 @@ class Word:
         array = array.T
 
         x: int = self.left
-        y: int = 0
         while x < self.right:
-            if array[x, y] <= LETTER_THRESHOLD:
-                l, r = Letter.flood_fill_right(x, y, 0, len(array[0]), array)
-                if l != r:
+            for y in range(len(array[0])):
+                if array[x, y] <= LETTER_THRESHOLD:
+                    l, r, pixels = Letter.flood_fill(x, y, array)
+
                     self.letters.append(Letter(l, r + 1))
-                x = r + 1
-                y = 0
-            else:
-                y += 1
-                if y >= len(array[0]):
-                    y = 0
-                    x += 1
+                    self.letters[-1].pixels = pixels
+                    
+                    x = r + 1
+                    break
+            x += 1
 
 class Line:
     # ========================================
