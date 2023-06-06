@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import numpy as np
-from PIL import Image, ImageOps
-from pdf2image import convert_from_path
+from utils import transpose
 
-LETTER_SPACE: int = 4
+LETTER_SPACING: int = 4
 LETTER_THRESHOLD: int = 180
+
 
 class Letter:
     # ========================================
@@ -14,12 +14,11 @@ class Letter:
 
     pixels: list[tuple[int, int]]
     # ========================================
-    
+
     def __init__(self, left: int, right: int):
         self.left = left
         self.right = right
-        
-    
+
     @staticmethod
     def flood_fill(x_pos: int, y_pos: int, array: np.ndarray) -> tuple[int, int, list[tuple[int, int]]]:
         list_pos: list[tuple(int, int)] = [(x_pos, y_pos)]
@@ -43,6 +42,7 @@ class Letter:
         
         return left, right, list_pos
 
+
 class Word:
     # ========================================
     left: int
@@ -50,14 +50,14 @@ class Word:
 
     letters: list[Letter]
     # ========================================
-    
+
     def __init__(self, left: int, right: int):
         self.left = left
         self.right = right
 
     def set_letters(self, array: np.ndarray):
         self.letters = []
-        array = array.T
+        array = transpose(array)
 
         x: int = self.left
         while x < self.right:
@@ -72,6 +72,7 @@ class Word:
                     break
             x += 1
 
+
 class Line:
     # ========================================
     top: int
@@ -83,32 +84,32 @@ class Line:
     def __init__(self, top: int, bottom: int):
         self.top = top
         self.bottom = bottom
-    
+
     def set_words(self, array: np.ndarray):
         self.words = []
-        array = array[self.top: self.bottom].T
+        array = array[self.top : self.bottom].T
 
-        start: int = -1
-        end: int = -1
+        left: int = -1
+        right: int = -1
         inWord: bool = False
         for i, line in enumerate(array):
-            if sum(line) / len(line) == 255: #no black pixel in column
+            if sum(line) / len(line) == 255:
                 if inWord:
-                    if end == -1:
-                        end = i
-                    elif (i - end >= LETTER_SPACE):
-                        self.words.append(Word(start, end))
+                    if right == -1:
+                        right = i
+                    elif i - right >= LETTER_SPACING:
+                        self.words.append(Word(left, right))
                         inWord = False
-                
+
             else:
-                end = -1
-                if not(inWord):
-                    start = i
+                right = -1
+                if not (inWord):
+                    left = i
                     inWord = True
-    
+
     def set_letters(self, array: np.ndarray):
         if self.words == None:
             self.set_words(array)
-        
+
         for word in self.words:
-            word.set_letters(array[self.top: self.bottom])
+            word.set_letters(array[self.top : self.bottom])
