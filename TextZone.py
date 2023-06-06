@@ -1,63 +1,66 @@
 from __future__ import annotations
 
 import numpy as np
-from PIL import Image, ImageOps
-from pdf2image import convert_from_path
+from utils import transpose
 
-LETTER_SPACE: int = 4
-LETTER_THRESHOLD: int = 240
+LETTER_SPACING: int = 4
+LETTER_THRESHOLD: int = 180
+
 
 class Letter:
     # ========================================
     left: int
     right: int
     # ========================================
-    
+
     def __init__(self, left: int, right: int):
         self.left = left
         self.right = right
-        
-    
+
     @staticmethod
-    def flood_fill_right(x_pos: int, y_pos: int, y_min: int, y_max: int, array: np.ndarray) -> tuple[int, int]:
+    def flood_fill_right(
+        x_pos: int, y_pos: int, y_min: int, y_max: int, array: np.ndarray
+    ) -> tuple[int, int]:
         list_pos: list[tuple(int, int)] = [(x_pos, y_pos)]
         row_empty: bool = False
 
-        y_pos = y_max - 1
+        y_pos: int = y_max - 1
         left: int = x_pos
         right: int = x_pos
 
         positiveStep: bool = False
 
-        while not(row_empty) or y_pos < y_max or not(positiveStep):
+        while not (row_empty) or y_pos < y_max or not (positiveStep):
             if y_pos >= y_max and positiveStep:
                 y_pos = y_max - 1
                 x_pos += 1
                 row_empty = True
                 positiveStep = False
-            elif y_pos <= y_min and not(positiveStep):
+            elif y_pos <= y_min and not (positiveStep):
                 y_pos = y_min
                 positiveStep = True
-            
+
             if array[x_pos, y_pos] <= LETTER_THRESHOLD:
                 connected: bool = (
-                       (x_pos, y_pos + 1)     in list_pos
-                    or (x_pos, y_pos - 1)     in list_pos
-                    or (x_pos + 1, y_pos)     in list_pos
-                    or (x_pos - 1, y_pos)     in list_pos
+                    (x_pos, y_pos + 1) in list_pos
+                    or (x_pos, y_pos - 1) in list_pos
+                    or (x_pos + 1, y_pos) in list_pos
+                    or (x_pos - 1, y_pos) in list_pos
                     or (x_pos + 1, y_pos + 1) in list_pos
-                    or (x_pos - 1, y_pos + 1) in list_pos 
+                    or (x_pos - 1, y_pos + 1) in list_pos
                     or (x_pos + 1, y_pos - 1) in list_pos
-                    or (x_pos - 1, y_pos - 1) in list_pos)
+                    or (x_pos - 1, y_pos - 1) in list_pos
+                )
 
                 if connected:
                     row_empty = False
                     list_pos.append((x_pos, y_pos))
                     right = max(right, x_pos)
-            
+
             y_pos += 1 if positiveStep else -1
 
         return left, right
+
 
 class Word:
     # ========================================
@@ -66,14 +69,14 @@ class Word:
 
     letters: list[Letter]
     # ========================================
-    
+
     def __init__(self, left: int, right: int):
         self.left = left
         self.right = right
 
     def set_letters(self, array: np.ndarray):
         self.letters = []
-        array = array.T
+        array = transpose(array)
 
         x: int = self.left
         y: int = 0
@@ -90,6 +93,7 @@ class Word:
                     y = 0
                     x += 1
 
+
 class Line:
     # ========================================
     top: int
@@ -101,32 +105,32 @@ class Line:
     def __init__(self, top: int, bottom: int):
         self.top = top
         self.bottom = bottom
-    
+
     def set_words(self, array: np.ndarray):
         self.words = []
-        array = array[self.top: self.bottom].T
+        array = array[self.top : self.bottom].T
 
-        start: int = -1
-        end: int = -1
+        left: int = -1
+        right: int = -1
         inWord: bool = False
         for i, line in enumerate(array):
-            if sum(line) / len(line) == 255: #no black pixel in column
+            if sum(line) / len(line) == 255:
                 if inWord:
-                    if end == -1:
-                        end = i
-                    elif (i - end >= LETTER_SPACE):
-                        self.words.append(Word(start, end))
+                    if right == -1:
+                        right = i
+                    elif i - right >= LETTER_SPACING:
+                        self.words.append(Word(left, right))
                         inWord = False
-                
+
             else:
-                end = -1
-                if not(inWord):
-                    start = i
+                right = -1
+                if not (inWord):
+                    left = i
                     inWord = True
-    
+
     def set_letters(self, array: np.ndarray):
         if self.words == None:
             self.set_words(array)
-        
+
         for word in self.words:
-            word.set_letters(array[self.top: self.bottom])
+            word.set_letters(array[self.top : self.bottom])

@@ -5,6 +5,8 @@ import numexpr as ne
 from PIL import Image, ImageOps
 from pdf2image import convert_from_path
 from TextZone import Line, LETTER_THRESHOLD
+from utils import transpose
+
 
 class Page:
     # ========================================
@@ -15,12 +17,12 @@ class Page:
 
     lines: list[Line] = None
     # ========================================
-    
+
     def __init__(self, image: Image.Image):
-        self.image: Image.Image = image
-        self.array: np.ndarray = np.array(image)
-        self.width: int = image.width
-        self.height: int = image.height
+        self.image = image
+        self.array = np.array(image)
+        self.width = image.width
+        self.height = image.height
 
     @staticmethod
     def from_array(array: np.ndarray) -> Page:
@@ -31,6 +33,7 @@ class Page:
 
     def grayscaled(self) -> Page:
         return Page(ImageOps.grayscale(self.image))
+
     def show_threshold(self):
         arr = self.grayscaled().array
         tr = LETTER_THRESHOLD
@@ -45,57 +48,62 @@ class Page:
             if inLine and sum(line) / self.width == 255:
                 self.lines.append(Line(start, i))
                 inLine = False
-            elif not(inLine) and sum(line) / self.width != 255:
+            elif not (inLine) and sum(line) / self.width != 255:
                 start = i
                 inLine = True
 
     def show_lines(self):
         if self.lines == None:
             self.set_lines()
-        
+
         parsed = self.array.copy()
         for line in self.lines:
             parsed[line.top] = [[0, 255, 0] for _ in range(self.width)]
             parsed[line.bottom] = [[255, 0, 0] for _ in range(self.width)]
         return Page.from_array(np.array(parsed)).show()
+
     def show_words(self):
         if self.lines == None:
             self.set_lines()
         for line in self.lines:
             line.set_words(self.grayscaled().array)
-        
+
         parsed = self.array.copy()
         for line in self.lines:
             for word in line.words:
-                parsed[line.top][word.left: word.right] = [0, 255, 0]
-                parsed[line.bottom][word.left: word.right] = [255, 0, 0]
+                parsed[line.top][word.left : word.right] = [0, 255, 0]
+                parsed[line.bottom][word.left : word.right] = [255, 0, 0]
         return Page.from_array(np.array(parsed)).show()
+
     def show_letters(self):
         if self.lines == None:
             self.set_lines()
-        
+
         for line in self.lines:
             line.set_letters(self.grayscaled().array)
         # self.lines[0].set_letters(self.grayscaled().array)
         # self.lines = [self.lines[0]]
-        
+
         parsed = self.array.copy()
         for line in self.lines:
             for word in line.words:
-                parsed[line.top, word.left: word.right] = [0, 255, 0]
-                parsed[line.bottom, word.left: word.right] = [255, 0, 0]
+                parsed[line.top, word.left : word.right] = [0, 255, 0]
+                parsed[line.bottom, word.left : word.right] = [255, 0, 0]
 
                 alternate: bool = False
                 for letter in word.letters:
-                    parsed[line.bottom: line.bottom + 5, letter.left: letter.right, 2] -= 25 if alternate else 75
-                    alternate = not(alternate)
+                    parsed[
+                        line.bottom : line.bottom + 5, letter.left : letter.right, 2
+                    ] -= (25 if alternate else 75)
+                    alternate = not (alternate)
         return Page.from_array(np.array(parsed)).show()
+
     def show_columns(self):
-        parsed = self.array.transpose(1, 0, 2)
-        for j, column in enumerate(self.grayscaled().array.transpose()):
+        parsed = transpose(self.array)
+        for j, column in enumerate(transpose(self.grayscaled().array)):
             if sum(column) / self.height == 255:
                 parsed[j] = [[255, 0, 0] for _ in range(self.height)]
-        return Page.from_array(np.array(parsed.transpose(1, 0, 2))).show()
+        return Page.from_array(np.array(transpose(parsed))).show()
 
 
 class PDF:
@@ -104,11 +112,11 @@ class PDF:
     # ========================================
 
     def __init__(self, path: str):
-        ext: str = path.split('.')[-1]
+        ext: str = path.split(".")[-1]
 
         if ext == "pdf":
             self.pages: list[Page] = [Page(image) for image in convert_from_path(path)]
         elif ext == "png":
             self.pages: list[Page] = [Page(Image.open(path))]
         else:
-            raise TypeError("wrong extention")
+            raise TypeError("Wrong extension")
