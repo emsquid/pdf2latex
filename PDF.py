@@ -4,7 +4,7 @@ import numpy as np
 import numexpr as ne
 from PIL import Image, ImageOps
 from pdf2image import convert_from_path
-import multiprocessing, time
+import multiprocessing
 
 from TextZone import Line, Word, LETTER_THRESHOLD
 
@@ -66,36 +66,40 @@ class Page:
         for line in self.lines:
             line.set_words(array[line.top : line.bottom])
 
+    def set_words_threaded(self):
+        self.set_lines()
+
+        array = self.grayscaled().array
+        with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+            args = [
+                (line, array[line.top : line.bottom], l)
+                for l, line in enumerate(self.lines)
+            ]
+
+            for words, l in pool.starmap(Line.get_words, args):
+                self.lines[l].words = words
+
     def set_letters(self):
         self.set_words()
-
-        start: float = time.time()
 
         array = self.grayscaled().array
         for line in self.lines:
             for word in line.words:
                 word.set_letters(array[line.top : line.bottom])
 
-        print("non threaded : ", time.time() - start)
-
-
     def set_letters_threaded(self):
-        self.set_words()
-
-        start: float = time.time()
+        self.set_words_threaded()
 
         array = self.grayscaled().array
-        
-        with multiprocessing.Pool(8) as p:
-            results = p.starmap(Word.get_letters, [
+        with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+            args = [
                 (word, array[line.top : line.bottom], l, w)
                 for l, line in enumerate(self.lines)
-                for w, word in enumerate(line.words)])
-            
-            for result in results:
-                self.lines[result[1]].words[result[2]].letters = result[0]
-        
-        print("threaded : ", time.time() - start)
+                for w, word in enumerate(line.words)
+            ]
+
+            for letters, l, w in pool.starmap(Word.get_letters, args):
+                self.lines[l].words[w].letters = letters
 
     def show(self):
         self.image.show()

@@ -65,17 +65,8 @@ class Word:
             x += 1
 
     def get_letters(self, array: np.ndarray, line_index: int = 0, word_index: int = 0):
-        letters = []
-        x: int = self.left
-        while x < self.right:
-            for y in range(len(array)):
-                if array[y, x] <= LETTER_THRESHOLD:
-                    letters.append(Letter.from_flood_fill(x, y, array))
-                    x = letters[-1].right
-                    break
-            x += 1
-
-        return (letters, line_index, word_index)
+        self.set_letters(array)
+        return (self.letters, line_index, word_index)
 
 
 class Line:
@@ -111,3 +102,7 @@ class Line:
                 if not inWord:
                     left = i
                     inWord = True
+
+    def get_words(self, array: np.ndarray, line_index: int = 0):
+        self.set_words(array)
+        return (self.words, line_index)
