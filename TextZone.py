@@ -64,6 +64,19 @@ class Word:
                     break
             x += 1
 
+    def get_letters(self, array: np.ndarray, line_index: int = 0, word_index: int = 0):
+        letters = []
+        x: int = self.left
+        while x < self.right:
+            for y in range(len(array)):
+                if array[y, x] <= LETTER_THRESHOLD:
+                    letters.append(Letter.from_flood_fill(x, y, array))
+                    x = letters[-1].right
+                    break
+            x += 1
+
+        return (letters, line_index, word_index)
+
 
 class Line:
     # ========================================

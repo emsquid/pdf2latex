@@ -4,8 +4,9 @@ import numpy as np
 import numexpr as ne
 from PIL import Image, ImageOps
 from pdf2image import convert_from_path
+import multiprocessing, time
 
-from TextZone import Line, LETTER_THRESHOLD
+from TextZone import Line, Word, LETTER_THRESHOLD
 
 
 class Page:
@@ -68,10 +69,33 @@ class Page:
     def set_letters(self):
         self.set_words()
 
+        start: float = time.time()
+
         array = self.grayscaled().array
         for line in self.lines:
             for word in line.words:
                 word.set_letters(array[line.top : line.bottom])
+
+        print("non threaded : ", time.time() - start)
+
+
+    def set_letters_threaded(self):
+        self.set_words()
+
+        start: float = time.time()
+
+        array = self.grayscaled().array
+        
+        with multiprocessing.Pool(8) as p:
+            results = p.starmap(Word.get_letters, [
+                (word, array[line.top : line.bottom], l, w)
+                for l, line in enumerate(self.lines)
+                for w, word in enumerate(line.words)])
+            
+            for result in results:
+                self.lines[result[1]].words[result[2]].letters = result[0]
+        
+        print("threaded : ", time.time() - start)
 
     def show(self):
         self.image.show()
@@ -98,7 +122,7 @@ class Page:
         return Page.from_array(np.array(parsed)).show()
 
     def show_letters(self):
-        self.set_letters()
+        self.set_letters_threaded()
 
         parsed = self.array_rgb
         for line in self.lines:
@@ -107,6 +131,7 @@ class Page:
                 parsed[line.bottom, word.left : word.right + 1] = [255, 0, 0]
 
                 alternate: bool = False
+
                 for letter in word.letters:
                     parsed[
                         line.bottom : line.bottom + 3,
