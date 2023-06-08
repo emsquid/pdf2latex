@@ -26,52 +26,16 @@ impl Rect {
     }
 }
 
-pub struct Glyph {
+pub struct Char {
     pub rect: Rect,
 }
 
-impl Glyph {
-    pub fn new(rect: Rect) -> Glyph {
-        Glyph { rect }
-    }
-}
-
-pub struct Word {
-    pub rect: Rect,
-    pub glyphs: Vec<Glyph>,
-}
-
-impl Word {
-    pub fn new(rect: Rect, image: DynamicImage) -> Word {
-        Word {
-            rect,
-            glyphs: Word::get_glyphs(rect, image),
-        }
+impl Char {
+    pub fn new(rect: Rect) -> Char {
+        Char { rect }
     }
 
-    fn get_glyphs(bound: Rect, image: DynamicImage) -> Vec<Glyph> {
-        let gray = image.to_luma8();
-
-        let mut glyphs = Vec::new();
-        let mut x = 0;
-
-        while x < gray.width() {
-            for y in 0..gray.height() {
-                if gray[(x, y)].0[0] <= GLYPH_THRESHOLD {
-                    let width = Word::flood_fill(gray.clone(), (x, y));
-                    let rect = Rect::new(bound.x + x, bound.y, width + 1, bound.height);
-                    glyphs.push(Glyph::new(rect));
-                    x += rect.width;
-                    break;
-                }
-            }
-            x += 1;
-        }
-
-        glyphs
-    }
-
-    fn flood_fill(gray: GrayImage, pos: (u32, u32)) -> u32 {
+    pub fn flood_fill(gray: GrayImage, pos: (u32, u32)) -> u32 {
         let mut pixels = vec![pos];
         let mut index = 0;
         let mut width = 0;
@@ -97,6 +61,42 @@ impl Word {
         }
 
         width
+    }
+}
+
+pub struct Word {
+    pub rect: Rect,
+    pub chars: Vec<Char>,
+}
+
+impl Word {
+    pub fn new(rect: Rect, image: DynamicImage) -> Word {
+        Word {
+            rect,
+            chars: Word::get_chars(rect, image),
+        }
+    }
+
+    fn get_chars(bound: Rect, image: DynamicImage) -> Vec<Char> {
+        let gray = image.to_luma8();
+
+        let mut chars = Vec::new();
+        let mut x = 0;
+
+        while x < gray.width() {
+            for y in 0..gray.height() {
+                if gray[(x, y)].0[0] <= GLYPH_THRESHOLD {
+                    let width = Char::flood_fill(gray.clone(), (x, y));
+                    let rect = Rect::new(bound.x + x, bound.y, width + 1, bound.height);
+                    chars.push(Char::new(rect));
+                    x += rect.width;
+                    break;
+                }
+            }
+            x += 1;
+        }
+
+        chars
     }
 }
 

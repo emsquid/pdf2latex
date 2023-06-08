@@ -1,11 +1,16 @@
 mod pdf;
 mod poppler;
+mod result;
 mod text;
 
+fn process(path: &str) -> result::Result<()> {
+    let file = pdf::Pdf::load(path)?;
+    println!("{}", file.pages.len());
+    Ok(())
+}
+
 fn main() {
-    let test = pdf::Pdf::load("test/test_2_toLatex.pdf");
-    let rect = test.pages[0].lines[2].words[1].glyphs[3].rect;
-    rect.crop(test.pages[0].image.clone())
-        .save("test/1.png")
-        .unwrap();
+    if let Err(err) = process("test/test_1_toLatex.pdf") {
+        eprintln!("{err}");
+    }
 }
