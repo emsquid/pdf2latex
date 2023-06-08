@@ -1,5 +1,6 @@
 use crate::{
     poppler::pdf_to_images,
+    result::Result,
     text::{Line, Rect},
 };
 use image::DynamicImage;
@@ -17,7 +18,7 @@ impl Page {
         }
     }
 
-    pub fn get_lines(image: DynamicImage) -> Vec<Line> {
+    fn get_lines(image: DynamicImage) -> Vec<Line> {
         let mut lines = Vec::new();
         let mut y = 0;
 
@@ -42,12 +43,11 @@ pub struct Pdf {
 }
 
 impl Pdf {
-    pub fn load(path: &str) -> Pdf {
-        Pdf {
-            pages: pdf_to_images(path, 200)
-                .iter()
-                .map(|image| Page::from(image.clone()))
-                .collect(),
-        }
+    pub fn load(path: &str) -> Result<Pdf> {
+        let pages = pdf_to_images(path, 200)?
+            .iter()
+            .map(|image| Page::from(image.clone()))
+            .collect();
+        Ok(Pdf { pages })
     }
 }
