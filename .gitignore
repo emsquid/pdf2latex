@@ -3,3 +3,6 @@ target
 Cargo.lock
 fonts
 test.py
+
+python/temp/*
+test/1.png
