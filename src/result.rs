@@ -6,6 +6,8 @@ pub enum Error {
     Parsing(std::num::ParseIntError),
     /// Image error
     Image(image::error::ImageError),
+    /// Font error
+    Font(ab_glyph::InvalidFont),
     /// Custom error
     Custom(String),
 }
@@ -16,6 +18,7 @@ impl std::fmt::Display for Error {
             Error::Io(err) => write!(f, "Io error: {err}"),
             Error::Parsing(err) => write!(f, "Parsing error: {err}"),
             Error::Image(err) => write!(f, "Image error: {err}"),
+            Error::Font(err) => write!(f, "Font error: {err}"),
             Error::Custom(err) => write!(f, "{err}"),
         }
     }
@@ -38,6 +41,12 @@ impl From<std::num::ParseIntError> for Error {
 impl From<image::ImageError> for Error {
     fn from(err: image::ImageError) -> Self {
         Error::Image(err)
+    }
+}
+
+impl From<ab_glyph::InvalidFont> for Error {
+    fn from(err: ab_glyph::InvalidFont) -> Self {
+        Error::Font(err)
     }
 }
 

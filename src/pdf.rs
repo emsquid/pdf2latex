@@ -1,9 +1,9 @@
-use crate::{
-    poppler::pdf_to_images,
-    result::Result,
-    text::{Line, Rect},
-};
+use crate::result::Result;
+use crate::text::{Line, Rect};
+use crate::utils::{find_parts, get_rasterized_glyphs, pdf_to_images};
 use image::DynamicImage;
+
+const LINE_SPACING: u32 = 5;
 
 pub struct Page {
     pub image: DynamicImage,
@@ -11,30 +11,43 @@ pub struct Page {
 }
 
 impl Page {
-    pub fn from(image: DynamicImage) -> Page {
+    pub fn from(image: &DynamicImage) -> Page {
         Page {
             image: image.clone(),
-            lines: Page::get_lines(image),
+            lines: Page::find_lines(image),
         }
     }
 
-    fn get_lines(image: DynamicImage) -> Vec<Line> {
-        let mut lines = Vec::new();
-        let mut y = 0;
+    fn find_lines(image: &DynamicImage) -> Vec<Line> {
+        let gray = image.to_luma8();
 
-        for (i, row) in image.to_luma8().enumerate_rows() {
-            let average = row.map(|l| u32::from(l.2 .0[0])).sum::<u32>() / image.width();
-            if y == 0 && average != 255 {
-                y = i;
-            } else if y != 0 && average == 255 {
-                let rect = Rect::new(0, y, image.width(), i - y);
-                let cropped = image.crop_imm(rect.x, rect.y, rect.width, rect.height);
-                lines.push(Line::new(rect, cropped));
-                y = 0;
+        let lines = find_parts(gray, LINE_SPACING)
+            .into_iter()
+            .map(|(start, end)| {
+                let rect = Rect::new(0, start, image.width(), end - start + 1);
+                Line::new(rect, image)
+            })
+            .collect();
+
+        lines
+    }
+
+    pub fn get_text(&self) -> Result<String> {
+        let mut text = String::new();
+
+        let font = "fonts/lmroman10-regular.otf";
+        let glyphs = get_rasterized_glyphs(font)?;
+
+        for line in self.lines.iter() {
+            for word in line.words.iter() {
+                for char in word.chars.iter() {
+                    text.push(char.guess(&self.image, &glyphs));
+                }
+                text.push(' ');
             }
         }
 
-        lines
+        Ok(text)
     }
 }
 
@@ -46,7 +59,7 @@ impl Pdf {
     pub fn load(path: &str) -> Result<Pdf> {
         let pages = pdf_to_images(path, 200)?
             .iter()
-            .map(|image| Page::from(image.clone()))
+            .map(|image| Page::from(image))
             .collect();
         Ok(Pdf { pages })
     }

@@ -1,7 +1,9 @@
-use image::{DynamicImage, GrayImage};
+use crate::utils::{find_parts, flood_fill, squared_distance};
+use image::imageops::overlay;
+use image::{DynamicImage, Rgb};
 
-const GLYPH_SPACING: u32 = 5;
-const GLYPH_THRESHOLD: u8 = 180;
+const WORD_SPACING: u32 = 5;
+const CHAR_THRESHOLD: u8 = 175;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Rect {
@@ -21,7 +23,7 @@ impl Rect {
         }
     }
 
-    pub fn crop(self, image: DynamicImage) -> DynamicImage {
+    pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
         image.crop_imm(self.x, self.y, self.width, self.height)
     }
 }
@@ -35,32 +37,58 @@ impl Char {
         Char { rect }
     }
 
-    pub fn flood_fill(gray: GrayImage, pos: (u32, u32)) -> u32 {
-        let mut pixels = vec![pos];
-        let mut index = 0;
-        let mut width = 0;
+    pub fn find_rect(bounds: Rect, start: (u32, u32), image: &DynamicImage) -> Rect {
+        let mut rect = bounds.clone();
 
-        while index < pixels.len() {
-            let (x, y) = pixels[index];
-            for dx in -1..2 {
-                for dy in -1..2 {
-                    let nx = x.saturating_add_signed(dx);
-                    let ny = y.saturating_add_signed(dy);
+        let test = rect.crop(image).to_luma8();
 
-                    if nx < gray.width()
-                        && ny < gray.height()
-                        && !pixels.contains(&(nx, ny))
-                        && gray[(nx, ny)].0[0] <= GLYPH_THRESHOLD
-                    {
-                        pixels.push((nx, ny));
-                        width = std::cmp::max(nx.saturating_sub(pos.0), width);
-                    }
-                }
+        rect.width = flood_fill(start, test.clone(), CHAR_THRESHOLD)
+            .iter()
+            .map(|(x, _)| x.saturating_sub(start.0) + 1)
+            .max()
+            .unwrap();
+        rect.x += start.0;
+
+        // TODO: temporary fix
+        for y in 0..test.height() {
+            if start.0 != 0 && test[(start.0 - 1, y)].0[0] != 255 {
+                rect.x -= 1;
+                break;
             }
-            index += 1;
         }
 
-        width
+        let parts = find_parts(rect.crop(image).to_luma8(), 0);
+
+        rect.height = parts[parts.len() - 1].1 - parts[0].0 + 1;
+        rect.y += parts[0].0;
+
+        rect
+    }
+
+    pub fn get_glyph(&self, image: &DynamicImage) -> Vec<u8> {
+        let mut bottom = image::RgbImage::from_pixel(32, 32, Rgb([255, 255, 255]));
+        let top = self.rect.crop(image).to_rgb8();
+        overlay(&mut bottom, &top, 0, 0);
+
+        DynamicImage::ImageRgb8(bottom).to_luma8().into_raw()
+    }
+
+    pub fn guess(&self, image: &DynamicImage, glyphs: &Vec<(char, Vec<u8>)>) -> char {
+        let reference = self.get_glyph(image);
+
+        let mut closest = (' ', std::f32::MAX);
+
+        for (chr, glyph) in glyphs.iter() {
+            // TODO: temporary fix
+            if chr.is_ascii() {
+                let dist = squared_distance(&reference, glyph);
+                if dist < closest.1 {
+                    closest = (*chr, dist);
+                }
+            }
+        }
+
+        closest.0
     }
 }
 
@@ -70,24 +98,23 @@ pub struct Word {
 }
 
 impl Word {
-    pub fn new(rect: Rect, image: DynamicImage) -> Word {
+    pub fn new(rect: Rect, image: &DynamicImage) -> Word {
         Word {
             rect,
-            chars: Word::get_chars(rect, image),
+            chars: Word::find_chars(rect, image),
         }
     }
 
-    fn get_chars(bound: Rect, image: DynamicImage) -> Vec<Char> {
-        let gray = image.to_luma8();
+    fn find_chars(bounds: Rect, image: &DynamicImage) -> Vec<Char> {
+        let gray = bounds.crop(image).to_luma8();
 
         let mut chars = Vec::new();
         let mut x = 0;
 
         while x < gray.width() {
             for y in 0..gray.height() {
-                if gray[(x, y)].0[0] <= GLYPH_THRESHOLD {
-                    let width = Char::flood_fill(gray.clone(), (x, y));
-                    let rect = Rect::new(bound.x + x, bound.y, width + 1, bound.height);
+                if gray[(x, y)].0[0] <= CHAR_THRESHOLD {
+                    let rect = Char::find_rect(bounds, (x, y), image);
                     chars.push(Char::new(rect));
                     x += rect.width;
                     break;
@@ -106,36 +133,23 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn new(rect: Rect, image: DynamicImage) -> Line {
+    pub fn new(rect: Rect, image: &DynamicImage) -> Line {
         Line {
             rect,
-            words: Line::get_words(rect, image),
+            words: Line::find_words(rect, image),
         }
     }
 
-    fn get_words(bound: Rect, image: DynamicImage) -> Vec<Word> {
-        let mut words = Vec::new();
-        let mut x = 0;
-        let mut width = 0;
+    fn find_words(bounds: Rect, image: &DynamicImage) -> Vec<Word> {
+        let gray = bounds.crop(image).rotate90().to_luma8();
 
-        for (i, column) in image.rotate90().to_luma8().enumerate_rows() {
-            let average = column.map(|l| u32::from(l.2 .0[0])).sum::<u32>() / image.height();
-            if x != 0 && average == 255 {
-                if width == 0 {
-                    width = i - x;
-                } else if i - (x + width) >= GLYPH_SPACING {
-                    let rect = Rect::new(bound.x + x, bound.y, width, bound.height);
-                    let cropped = image.crop_imm(x, 0, rect.width, rect.height);
-                    words.push(Word::new(rect, cropped));
-                    x = 0;
-                }
-            } else if average != 255 {
-                width = 0;
-                if x == 0 {
-                    x = i;
-                }
-            }
-        }
+        let words = find_parts(gray, WORD_SPACING)
+            .into_iter()
+            .map(|(start, end)| {
+                let rect = Rect::new(bounds.x + start, bounds.y, end - start + 1, bounds.height);
+                Word::new(rect, image)
+            })
+            .collect();
 
         words
     }

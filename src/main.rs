@@ -1,11 +1,13 @@
 mod pdf;
-mod poppler;
 mod result;
 mod text;
+mod utils;
 
 fn process(path: &str) -> result::Result<()> {
     let file = pdf::Pdf::load(path)?;
-    println!("{}", file.pages.len());
+
+    println!("{}", file.pages[0].get_text()?);
+
     Ok(())
 }
 
