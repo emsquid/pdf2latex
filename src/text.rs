@@ -40,27 +40,21 @@ impl Char {
     pub fn find_rect(bounds: Rect, start: (u32, u32), image: &DynamicImage) -> Rect {
         let mut rect = bounds.clone();
 
-        let test = rect.crop(image).to_luma8();
+        let pixels = flood_fill(start, rect.crop(image).to_luma8(), CHAR_THRESHOLD);
 
-        rect.width = flood_fill(start, test.clone(), CHAR_THRESHOLD)
+        let x = pixels.iter().map(|(x, _)| x).min().unwrap();
+        rect.x += x;
+        rect.width = pixels
             .iter()
-            .map(|(x, _)| x.saturating_sub(start.0) + 1)
+            .map(|(px, _)| px.saturating_sub(*x) + 1)
             .max()
             .unwrap();
-        rect.x += start.0;
-
-        // TODO: temporary fix
-        for y in 0..test.height() {
-            if start.0 != 0 && test[(start.0 - 1, y)].0[0] != 255 {
-                rect.x -= 1;
-                break;
-            }
-        }
 
         let parts = find_parts(rect.crop(image).to_luma8(), 0);
 
-        rect.height = parts[parts.len() - 1].1 - parts[0].0 + 1;
-        rect.y += parts[0].0;
+        let y = parts[0].0;
+        rect.y += y;
+        rect.height = parts[parts.len() - 1].1 - y + 1;
 
         rect
     }
@@ -111,13 +105,13 @@ impl Word {
         let mut chars = Vec::new();
         let mut x = 0;
 
-        while x < gray.width() {
+        'outer: while x < gray.width() {
             for y in 0..gray.height() {
                 if gray[(x, y)].0[0] <= CHAR_THRESHOLD {
                     let rect = Char::find_rect(bounds, (x, y), image);
                     chars.push(Char::new(rect));
-                    x += rect.width;
-                    break;
+                    x = rect.x - bounds.x + rect.width;
+                    continue 'outer;
                 }
             }
             x += 1;

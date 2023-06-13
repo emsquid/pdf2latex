@@ -20,11 +20,11 @@ fn parse_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
         let infos = split(&buffer[start..start + 40], b'\n');
         let (code, size, rgb) = (infos[0], split(infos[1], b' '), infos[2]);
         let (width, height) = (parse_to_usize(size[0])?, parse_to_usize(size[1])?);
-        let end = code.len() + size.len() + rgb.len() + 10 + width * height * 3;
+        let size = code.len() + size.len() + rgb.len() + 10 + width * height * 3;
 
-        images.push(image::load_from_memory(&buffer[start..start + end])?);
+        images.push(image::load_from_memory(&buffer[start..start + size])?);
 
-        start += end;
+        start += size;
     }
 
     Ok(images)
@@ -77,20 +77,24 @@ pub fn flood_fill(start: (u32, u32), gray: GrayImage, threshold: u8) -> Vec<(u32
 
     while index < pixels.len() {
         let (x, y) = pixels[index];
-        for dx in -1..2 {
-            for dy in -1..2 {
-                let nx = x.saturating_add_signed(dx);
-                let ny = y.saturating_add_signed(dy);
 
-                if nx < gray.width()
-                    && ny < gray.height()
-                    && !pixels.contains(&(nx, ny))
-                    && gray[(nx, ny)].0[0] <= threshold
-                {
-                    pixels.push((nx, ny));
+        if gray[(x, y)].0[0] <= threshold {
+            for dx in -1..2 {
+                for dy in -1..2 {
+                    let nx = x.saturating_add_signed(dx);
+                    let ny = y.saturating_add_signed(dy);
+
+                    if nx < gray.width()
+                        && ny < gray.height()
+                        && !pixels.contains(&(nx, ny))
+                        && gray[(nx, ny)].0[0] < 255
+                    {
+                        pixels.push((nx, ny));
+                    }
                 }
             }
         }
+
         index += 1;
     }
 
@@ -112,11 +116,6 @@ pub fn raster_glyph(font: &FontVec, id: GlyphId) -> Vec<u8> {
     }
 
     DynamicImage::ImageRgb8(image).to_luma8().into_raw()
-}
-
-pub fn save_glyph(path: &str, font: &FontVec, id: GlyphId) -> Result<()> {
-    // raster_glyph(font, id).save(path)?;
-    Ok(())
 }
 
 pub fn get_rasterized_glyphs(fontpath: &str) -> Result<Vec<(char, Vec<u8>)>> {

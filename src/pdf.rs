@@ -1,9 +1,10 @@
 use crate::result::Result;
 use crate::text::{Line, Rect};
 use crate::utils::{find_parts, get_rasterized_glyphs, pdf_to_images};
-use image::DynamicImage;
+use image::imageops::overlay;
+use image::{DynamicImage, Rgba};
 
-const LINE_SPACING: u32 = 5;
+const LINE_SPACING: u32 = 3;
 
 pub struct Page {
     pub image: DynamicImage,
@@ -30,6 +31,34 @@ impl Page {
             .collect();
 
         lines
+    }
+
+    pub fn debug(&self) -> DynamicImage {
+        let mut copy = self.image.clone();
+
+        let mut alt = true;
+
+        for line in self.lines.iter() {
+            for word in line.words.iter() {
+                for chr in word.chars.iter() {
+                    let color = match alt {
+                        true => Rgba([255, 0, 0, 255]),
+                        false => Rgba([0, 255, 0, 255]),
+                    };
+                    alt = !alt;
+                    let sub = image::RgbaImage::from_pixel(chr.rect.width, 2, color);
+
+                    overlay(
+                        &mut copy,
+                        &sub,
+                        i64::from(chr.rect.x),
+                        i64::from(line.rect.y + line.rect.height + 1),
+                    );
+                }
+            }
+        }
+
+        copy
     }
 
     pub fn get_text(&self) -> Result<String> {
