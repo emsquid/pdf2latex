@@ -1,8 +1,9 @@
+use crate::font::{FontFamily, Glyph};
 use crate::utils::{find_parts, flood_fill, squared_distance};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgb};
 
-const WORD_SPACING: u32 = 10;
+const WORD_SPACING: u32 = 7;
 const CHAR_THRESHOLD: u8 = 175;
 
 #[derive(Clone, Copy, Debug)]
@@ -67,17 +68,17 @@ impl Char {
         DynamicImage::ImageRgb8(bottom).to_luma8().into_raw()
     }
 
-    pub fn guess(&self, image: &DynamicImage, glyphs: &Vec<(char, Vec<u8>)>) -> char {
+    pub fn guess(&self, image: &DynamicImage, family: &FontFamily) -> Glyph {
         let reference = self.get_glyph(image);
 
-        let mut closest = (' ', std::f32::MAX);
+        let mut closest = (family.glyphs[0].clone(), std::f32::MAX);
 
-        for (chr, glyph) in glyphs.iter() {
+        for glyph in family.glyphs.iter() {
             // TODO: temporary fix
-            if chr.is_ascii() {
-                let dist = squared_distance(&reference, glyph);
+            if glyph.chr.is_ascii() {
+                let dist = squared_distance(&reference, &glyph.image);
                 if dist < closest.1 {
-                    closest = (*chr, dist);
+                    closest = (glyph.clone(), dist);
                 }
             }
         }

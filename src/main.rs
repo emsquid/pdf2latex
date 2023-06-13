@@ -1,3 +1,4 @@
+mod font;
 mod pdf;
 mod result;
 mod text;

@@ -1,6 +1,7 @@
+use crate::font::{FontCode, FontFamily};
 use crate::result::Result;
 use crate::text::{Line, Rect};
-use crate::utils::{find_parts, get_rasterized_glyphs, pdf_to_images};
+use crate::utils::{find_parts, pdf_to_images};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgba};
 
@@ -36,13 +37,12 @@ impl Page {
     pub fn guess_text(&self) -> Result<String> {
         let mut text = String::new();
 
-        let font = "fonts/lmroman10-regular.otf";
-        let glyphs = get_rasterized_glyphs(font)?;
+        let family = FontFamily::from_code(FontCode::Lmr)?;
 
         for line in self.lines.iter() {
             for word in line.words.iter() {
                 for char in word.chars.iter() {
-                    text.push(char.guess(&self.image, &glyphs));
+                    text.push(char.guess(&self.image, &family).chr);
                 }
                 text.push(' ');
             }
