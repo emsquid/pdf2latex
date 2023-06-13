@@ -6,7 +6,8 @@ mod utils;
 fn process(path: &str) -> result::Result<()> {
     let file = pdf::Pdf::load(path)?;
 
-    file.pages[0].debug().save("test/test.png")?;
+    file.pages[0].debug().save("test/debug.png")?;
+    println!("{}", file.pages[0].guess_text()?);
 
     Ok(())
 }

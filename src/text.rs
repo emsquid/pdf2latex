@@ -2,7 +2,7 @@ use crate::utils::{find_parts, flood_fill, squared_distance};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgb};
 
-const WORD_SPACING: u32 = 5;
+const WORD_SPACING: u32 = 10;
 const CHAR_THRESHOLD: u8 = 175;
 
 #[derive(Clone, Copy, Debug)]

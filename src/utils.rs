@@ -103,7 +103,7 @@ pub fn flood_fill(start: (u32, u32), gray: GrayImage, threshold: u8) -> Vec<(u32
 
 pub fn raster_glyph(font: &FontVec, id: GlyphId) -> Vec<u8> {
     let mut image = image::RgbImage::from_pixel(32, 32, Rgb([255, 255, 255]));
-    let scale = font.pt_to_px_scale(23.0).unwrap();
+    let scale = font.pt_to_px_scale(10.0 * 300.0 / 96.0 + 3.0).unwrap();
     let glyph = id.with_scale(scale);
 
     if let Some(outlined) = font.outline_glyph(glyph) {
@@ -118,8 +118,23 @@ pub fn raster_glyph(font: &FontVec, id: GlyphId) -> Vec<u8> {
     DynamicImage::ImageRgb8(image).to_luma8().into_raw()
 }
 
+pub fn save_glyph(path: &str, glyph: Vec<u8>) -> Result<()> {
+    image::save_buffer_with_format(
+        path,
+        &glyph,
+        32,
+        32,
+        image::ColorType::L8,
+        image::ImageFormat::Png,
+    )?;
+
+    Ok(())
+}
+
 pub fn get_rasterized_glyphs(fontpath: &str) -> Result<Vec<(char, Vec<u8>)>> {
     let font = FontVec::try_from_vec(std::fs::read(fontpath)?)?;
+
+    save_glyph("test/a2.png", raster_glyph(&font, font.glyph_id('a')))?;
 
     let glyphs = font
         .codepoint_ids()

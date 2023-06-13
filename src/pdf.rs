@@ -4,7 +4,7 @@ use crate::utils::{find_parts, get_rasterized_glyphs, pdf_to_images};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgba};
 
-const LINE_SPACING: u32 = 3;
+const LINE_SPACING: u32 = 5;
 
 pub struct Page {
     pub image: DynamicImage,
@@ -31,6 +31,25 @@ impl Page {
             .collect();
 
         lines
+    }
+
+    pub fn guess_text(&self) -> Result<String> {
+        let mut text = String::new();
+
+        let font = "fonts/lmroman10-regular.otf";
+        let glyphs = get_rasterized_glyphs(font)?;
+
+        for line in self.lines.iter() {
+            for word in line.words.iter() {
+                for char in word.chars.iter() {
+                    text.push(char.guess(&self.image, &glyphs));
+                }
+                text.push(' ');
+            }
+            text.push('\n');
+        }
+
+        Ok(text)
     }
 
     pub fn debug(&self) -> DynamicImage {
@@ -60,24 +79,6 @@ impl Page {
 
         copy
     }
-
-    pub fn get_text(&self) -> Result<String> {
-        let mut text = String::new();
-
-        let font = "fonts/lmroman10-regular.otf";
-        let glyphs = get_rasterized_glyphs(font)?;
-
-        for line in self.lines.iter() {
-            for word in line.words.iter() {
-                for char in word.chars.iter() {
-                    text.push(char.guess(&self.image, &glyphs));
-                }
-                text.push(' ');
-            }
-        }
-
-        Ok(text)
-    }
 }
 
 pub struct Pdf {
@@ -86,7 +87,7 @@ pub struct Pdf {
 
 impl Pdf {
     pub fn load(path: &str) -> Result<Pdf> {
-        let pages = pdf_to_images(path, 200)?
+        let pages = pdf_to_images(path, 300)?
             .iter()
             .map(|image| Page::from(image))
             .collect();
