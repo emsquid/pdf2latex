@@ -1,8 +1,6 @@
 __pycache__
-target
-Cargo.lock
-fonts
+python/temp/*
 test.py
 
-python/temp/*
-test/1.png
+target
+Cargo.lock
