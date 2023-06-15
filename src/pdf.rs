@@ -2,6 +2,8 @@ use crate::font::{FontCode, FontFamily};
 use crate::result::Result;
 use crate::text::{Line, Rect};
 use crate::utils::{find_parts, pdf_to_images};
+use futures::future::ready;
+use futures::{stream, StreamExt};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgba};
 
@@ -13,13 +15,6 @@ pub struct Page {
 }
 
 impl Page {
-    pub fn from(image: &DynamicImage) -> Page {
-        Page {
-            image: image.clone(),
-            lines: Page::find_lines(image),
-        }
-    }
-
     fn find_lines(image: &DynamicImage) -> Vec<Line> {
         let lines = find_parts(image.to_luma8(), LINE_SPACING)
             .into_iter()
@@ -32,21 +27,11 @@ impl Page {
         lines
     }
 
-    pub fn guess(&self) -> Result<String> {
-        let family = FontFamily::from_code(FontCode::Lmr)?;
-
-        let mut text = String::new();
-        for line in self.lines.iter() {
-            for word in line.words.iter() {
-                for char in word.glyphs.iter() {
-                    text.push(char.guess(&family).chr);
-                }
-                text.push(' ');
-            }
-            text.push('\n');
+    pub fn from(image: &DynamicImage) -> Page {
+        Page {
+            image: image.clone(),
+            lines: Page::find_lines(image),
         }
-
-        Ok(text)
     }
 
     pub fn debug(&self) -> DynamicImage {
@@ -73,6 +58,64 @@ impl Page {
         }
 
         copy
+    }
+
+    #[tokio::main]
+    pub async fn guess_cpu_cool(&self) -> Result<String> {
+        let family = FontFamily::from_code(FontCode::Lmr)?;
+
+        let mut text = String::new();
+        stream::iter(self.lines.iter())
+            .map(|line| {
+                let family = &family;
+                async move {
+                    let mut line_text = String::new();
+                    for word in line.words.iter() {
+                        for glyph in word.glyphs.iter() {
+                            line_text.push(glyph.guess(family).chr);
+                        }
+                        line_text.push(' ');
+                    }
+                    line_text.push('\n');
+                    line_text
+                }
+            })
+            .buffered(8)
+            .for_each(|line_text| {
+                text.push_str(&line_text);
+                ready(())
+            })
+            .await;
+
+        Ok(text)
+    }
+
+    pub fn guess_cpu_hot(&self) -> Result<String> {
+        let family = FontFamily::from_code(FontCode::Lmr)?;
+
+        let mut text = String::new();
+        let mut handles = Vec::new();
+        for line in self.lines.clone() {
+            let family = family.clone();
+            let handle = std::thread::spawn(move || {
+                let mut line_text = String::new();
+                for word in line.words.iter() {
+                    for glyph in word.glyphs.iter() {
+                        line_text.push(glyph.guess(&family).chr);
+                    }
+                    line_text.push(' ');
+                }
+                line_text.push('\n');
+                line_text
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            text.push_str(&handle.join().unwrap());
+        }
+
+        Ok(text)
     }
 }
 

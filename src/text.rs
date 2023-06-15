@@ -1,4 +1,4 @@
-use crate::font::{FontFamily, Glyph};
+use crate::font::{FontFamily, FontGlyph};
 use crate::result::Result;
 use crate::utils::{find_parts, flood_fill, squared_distance};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb};
@@ -29,6 +29,7 @@ impl Rect {
     }
 }
 
+#[derive(Clone)]
 pub struct UnknownGlyph {
     pub rect: Rect,
     pub image: Vec<u8>,
@@ -105,7 +106,7 @@ impl UnknownGlyph {
         }
     }
 
-    pub fn guess(&self, family: &FontFamily) -> Glyph {
+    pub fn guess(&self, family: &FontFamily) -> FontGlyph {
         let mut closest = (family.glyphs[0].clone(), std::f32::MAX);
         for glyph in family.glyphs.iter() {
             let dist = squared_distance(&self.image, &glyph.image);
@@ -131,19 +132,13 @@ impl UnknownGlyph {
     }
 }
 
+#[derive(Clone)]
 pub struct Word {
     pub rect: Rect,
     pub glyphs: Vec<UnknownGlyph>,
 }
 
 impl Word {
-    pub fn new(rect: Rect, image: &DynamicImage) -> Word {
-        Word {
-            rect,
-            glyphs: Word::find_glyphs(rect, image),
-        }
-    }
-
     fn find_glyphs(bounds: Rect, image: &DynamicImage) -> Vec<UnknownGlyph> {
         let gray = bounds.crop(image).to_luma8();
 
@@ -163,21 +158,22 @@ impl Word {
 
         glyphs
     }
+
+    pub fn new(rect: Rect, image: &DynamicImage) -> Word {
+        Word {
+            rect,
+            glyphs: Word::find_glyphs(rect, image),
+        }
+    }
 }
 
+#[derive(Clone)]
 pub struct Line {
     pub rect: Rect,
     pub words: Vec<Word>,
 }
 
 impl Line {
-    pub fn new(rect: Rect, image: &DynamicImage) -> Line {
-        Line {
-            rect,
-            words: Line::find_words(rect, image),
-        }
-    }
-
     fn find_words(bounds: Rect, image: &DynamicImage) -> Vec<Word> {
         let words = find_parts(bounds.crop(image).rotate90().to_luma8(), WORD_SPACING)
             .into_iter()
@@ -188,5 +184,12 @@ impl Line {
             .collect();
 
         words
+    }
+
+    pub fn new(rect: Rect, image: &DynamicImage) -> Line {
+        Line {
+            rect,
+            words: Line::find_words(rect, image),
+        }
     }
 }

@@ -77,15 +77,21 @@ fn path_to_styles(path: &str) -> Vec<Style> {
 }
 
 #[derive(Clone)]
-pub struct Glyph {
+pub struct FontGlyph {
     pub chr: char,
     pub size: Size,
     pub styles: Vec<Style>,
     pub image: Vec<u8>,
 }
 
-impl Glyph {
-    pub fn from(font: &FontVec, id: GlyphId, chr: char, size: Size, styles: Vec<Style>) -> Glyph {
+impl FontGlyph {
+    pub fn from(
+        font: &FontVec,
+        id: GlyphId,
+        chr: char,
+        size: Size,
+        styles: Vec<Style>,
+    ) -> FontGlyph {
         let mut image = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
 
         // TODO: improve scale
@@ -102,7 +108,7 @@ impl Glyph {
             })
         }
 
-        Glyph {
+        FontGlyph {
             chr,
             size,
             styles,
@@ -124,23 +130,24 @@ impl Glyph {
     }
 }
 
+#[derive(Clone)]
 pub struct FontFamily {
     pub code: FontCode,
-    pub glyphs: Vec<Glyph>,
+    pub glyphs: Vec<FontGlyph>,
 }
 
 impl FontFamily {
-    fn load_font(path: &str) -> Result<Vec<Glyph>> {
+    fn load_font(path: &str) -> Result<Vec<FontGlyph>> {
         let font = FontVec::try_from_vec(std::fs::read(path)?)?;
         let sizes = [Size::Small, Size::Normalsize, Size::Large, Size::Huge];
         let styles = path_to_styles(path);
 
         let mut glyphs = Vec::new();
         for size in sizes {
-            glyphs.extend(
-                font.codepoint_ids()
-                    .map(|(id, chr)| Glyph::from(&font, id, chr, size.clone(), styles.clone())),
-            );
+            glyphs
+                .extend(font.codepoint_ids().map(|(id, chr)| {
+                    FontGlyph::from(&font, id, chr, size.clone(), styles.clone())
+                }));
         }
 
         Ok(glyphs)
