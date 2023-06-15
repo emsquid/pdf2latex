@@ -144,6 +144,13 @@ class Page:
                     ] -= (
                         100 if alternate else 200
                     )
+
+                    for pixel in letter.pixels:
+                        parsed[line.top + pixel[0][0]][pixel[0][1]] = (
+                            [min(255, pixel[1] + 50), min(255, pixel[1] + 50), 255]
+                              if alternate else 
+                            [min(255, pixel[1] + 50), 255, min(255, pixel[1] + 50)])
+
                     alternate = not alternate
 
         return Page.from_array(parsed).show()
@@ -158,7 +165,7 @@ class PDF:
         ext: str = path.split(".")[-1]
 
         if ext == "pdf":
-            self.pages: list[Page] = [Page(image) for image in convert_from_path(path)]
+            self.pages: list[Page] = [Page(image) for image in convert_from_path(path, 300)]
         elif ext == "png":
             self.pages: list[Page] = [Page(Image.open(path).convert("RGB"))]
         else:
