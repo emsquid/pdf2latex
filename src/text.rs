@@ -1,7 +1,7 @@
 use crate::font::{FontFamily, Glyph};
+use crate::result::Result;
 use crate::utils::{find_parts, flood_fill, squared_distance};
-use image::imageops::overlay;
-use image::{DynamicImage, Rgb};
+use image::{DynamicImage, GenericImageView, Pixel, Rgb};
 
 const WORD_SPACING: u32 = 7;
 const CHAR_THRESHOLD: u8 = 175;
@@ -29,53 +29,86 @@ impl Rect {
     }
 }
 
-pub struct Char {
+pub struct UnknownGlyph {
     pub rect: Rect,
+    pub image: Vec<u8>,
 }
 
-impl Char {
-    pub fn new(rect: Rect) -> Char {
-        Char { rect }
-    }
+impl UnknownGlyph {
+    fn find_rect(start: (u32, u32), bounds: Rect, image: &DynamicImage) -> Rect {
+        let base_pixels = flood_fill(vec![start], &bounds.crop(image).to_luma8(), CHAR_THRESHOLD);
 
-    pub fn find_rect(bounds: Rect, start: (u32, u32), image: &DynamicImage) -> Rect {
-        let mut rect = bounds.clone();
-
-        let pixels = flood_fill(start, rect.crop(image).to_luma8(), CHAR_THRESHOLD);
-
-        let x = pixels.iter().map(|(x, _)| x).min().unwrap();
-        rect.x += x;
-        rect.width = pixels
+        let x = base_pixels.iter().map(|(x, _)| *x).min().unwrap();
+        let width = base_pixels
             .iter()
-            .map(|(px, _)| px.saturating_sub(*x) + 1)
+            .map(|(px, _)| px.saturating_sub(x) + 1)
             .max()
             .unwrap();
 
-        let parts = find_parts(rect.crop(image).to_luma8(), 0);
-
-        let y = parts[0].0;
-        rect.y += y;
-        rect.height = parts[parts.len() - 1].1 - y + 1;
-
-        rect
+        Rect::new(bounds.x + x - 2, bounds.y, width + 4, bounds.height)
     }
 
-    pub fn get_glyph(&self, image: &DynamicImage) -> Vec<u8> {
-        let mut bottom = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
-        let top = self.rect.crop(image).to_rgb8();
-        overlay(&mut bottom, &top, 0, 0);
+    fn find_pixels(base: Rect, image: &DynamicImage) -> Vec<(u32, u32)> {
+        let gray = base.crop(image).to_luma8();
 
-        DynamicImage::ImageRgb8(bottom).to_luma8().into_raw()
+        let mut borders = Vec::new();
+        for x in [0, base.width - 1] {
+            for y in 0..base.height {
+                if gray[(x, y)].0[0] < 255 {
+                    borders.push((x, y))
+                }
+            }
+        }
+
+        let unwanted_pixels = flood_fill(borders, &gray, CHAR_THRESHOLD);
+
+        let mut pixels = Vec::new();
+        for x in 0..base.width {
+            for y in 0..base.height {
+                if gray[(x, y)].0[0] < 255 && !unwanted_pixels.contains(&(x, y)) {
+                    pixels.push((base.x + x, base.y + y));
+                }
+            }
+        }
+
+        pixels
     }
 
-    pub fn guess(&self, image: &DynamicImage, family: &FontFamily) -> Glyph {
-        let reference = self.get_glyph(image);
+    pub fn from(start: (u32, u32), bounds: Rect, image: &DynamicImage) -> UnknownGlyph {
+        let base = UnknownGlyph::find_rect(start, bounds, image);
+        let pixels = UnknownGlyph::find_pixels(base, image);
 
+        let x = pixels.iter().map(|(x, _)| *x).min().unwrap();
+        let y = pixels.iter().map(|(_, y)| *y).min().unwrap();
+        let width = pixels
+            .iter()
+            .map(|(px, _)| px.saturating_sub(x) + 1)
+            .max()
+            .unwrap();
+        let height = pixels
+            .iter()
+            .map(|(_, py)| py.saturating_sub(y) + 1)
+            .max()
+            .unwrap();
+
+        let mut glyph_image = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
+        for (px, py) in pixels.iter() {
+            if px - x < 64 && py - y < 64 {
+                let color = image.get_pixel(*px, *py).to_rgb();
+                glyph_image.put_pixel(px - x, py - y, color)
+            }
+        }
+
+        UnknownGlyph {
+            rect: Rect::new(x, y, width, height),
+            image: DynamicImage::ImageRgb8(glyph_image).to_luma8().into_raw(),
+        }
+    }
+
+    pub fn guess(&self, family: &FontFamily) -> Glyph {
         let mut closest = (family.glyphs[0].clone(), std::f32::MAX);
-
         for glyph in family.glyphs.iter() {
-            // TODO: temporary fix
-            let dist = squared_distance(&reference, &glyph.image);
+            let dist = squared_distance(&self.image, &glyph.image);
             if dist < closest.1 {
                 closest = (glyph.clone(), dist);
             }
@@ -83,40 +116,52 @@ impl Char {
 
         closest.0
     }
+
+    pub fn save(&self, path: &str) -> Result<()> {
+        image::save_buffer_with_format(
+            path,
+            &self.image,
+            64,
+            64,
+            image::ColorType::L8,
+            image::ImageFormat::Png,
+        )?;
+
+        Ok(())
+    }
 }
 
 pub struct Word {
     pub rect: Rect,
-    pub chars: Vec<Char>,
+    pub glyphs: Vec<UnknownGlyph>,
 }
 
 impl Word {
     pub fn new(rect: Rect, image: &DynamicImage) -> Word {
         Word {
             rect,
-            chars: Word::find_chars(rect, image),
+            glyphs: Word::find_glyphs(rect, image),
         }
     }
 
-    fn find_chars(bounds: Rect, image: &DynamicImage) -> Vec<Char> {
+    fn find_glyphs(bounds: Rect, image: &DynamicImage) -> Vec<UnknownGlyph> {
         let gray = bounds.crop(image).to_luma8();
 
-        let mut chars = Vec::new();
+        let mut glyphs = Vec::new();
         let mut x = 0;
-
         'outer: while x < gray.width() {
             for y in 0..gray.height() {
                 if gray[(x, y)].0[0] <= CHAR_THRESHOLD {
-                    let rect = Char::find_rect(bounds, (x, y), image);
-                    chars.push(Char::new(rect));
-                    x = rect.x - bounds.x + rect.width;
+                    let glyph = UnknownGlyph::from((x, y), bounds, image);
+                    x = glyph.rect.x - bounds.x + glyph.rect.width;
+                    glyphs.push(glyph);
                     continue 'outer;
                 }
             }
             x += 1;
         }
 
-        chars
+        glyphs
     }
 }
 
@@ -134,9 +179,7 @@ impl Line {
     }
 
     fn find_words(bounds: Rect, image: &DynamicImage) -> Vec<Word> {
-        let gray = bounds.crop(image).rotate90().to_luma8();
-
-        let words = find_parts(gray, WORD_SPACING)
+        let words = find_parts(bounds.crop(image).rotate90().to_luma8(), WORD_SPACING)
             .into_iter()
             .map(|(start, end)| {
                 let rect = Rect::new(bounds.x + start, bounds.y, end - start + 1, bounds.height);

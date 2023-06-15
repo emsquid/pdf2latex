@@ -70,8 +70,8 @@ pub fn find_parts(gray: GrayImage, spacing: u32) -> Vec<(u32, u32)> {
     parts
 }
 
-pub fn flood_fill(start: (u32, u32), gray: GrayImage, threshold: u8) -> Vec<(u32, u32)> {
-    let mut pixels = vec![start];
+pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Vec<(u32, u32)> {
+    let mut pixels = start;
     let mut index = 0;
 
     while index < pixels.len() {

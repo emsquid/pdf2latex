@@ -88,6 +88,7 @@ impl Glyph {
     pub fn from(font: &FontVec, id: GlyphId, chr: char, size: Size, styles: Vec<Style>) -> Glyph {
         let mut image = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
 
+        // TODO: improve scale
         let pt = size_to_pt(size);
         let scale = font.pt_to_px_scale(pt * 300.0 / 96.0 + 3.0).unwrap();
         let glyph = id.with_scale(scale);
@@ -130,12 +131,11 @@ pub struct FontFamily {
 
 impl FontFamily {
     fn load_font(path: &str) -> Result<Vec<Glyph>> {
-        let mut glyphs = Vec::new();
-
         let font = FontVec::try_from_vec(std::fs::read(path)?)?;
         let sizes = [Size::Small, Size::Normalsize, Size::Large, Size::Huge];
         let styles = path_to_styles(path);
 
+        let mut glyphs = Vec::new();
         for size in sizes {
             glyphs.extend(
                 font.codepoint_ids()
@@ -147,10 +147,9 @@ impl FontFamily {
     }
 
     pub fn from_code(code: FontCode) -> Result<FontFamily> {
-        let mut glyphs = Vec::new();
-
         let fonts = std::fs::read_dir(code_to_path(code))?;
 
+        let mut glyphs = Vec::new();
         for font in fonts {
             let path = font?.path();
             glyphs.extend(FontFamily::load_font(path.to_str().unwrap())?);
