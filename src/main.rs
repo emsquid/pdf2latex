@@ -9,13 +9,13 @@ fn process(path: &str) -> result::Result<()> {
 
     // file.pages[0].lines[0].words[0].chars[0].save("test/debug.png")?;
     // file.pages[0].debug().save("test/debug.png")?;
-    println!("{}", file.pages[0].guess_cpu_cool()?);
+    println!("{}", file.pages[0].guess_threaded()?);
 
     Ok(())
 }
 
 fn main() {
-    if let Err(err) = process("test/test_3_toLatex.pdf") {
+    if let Err(err) = process("test/test_1_toLatex.pdf") {
         eprintln!("{err}");
     }
 }

@@ -2,8 +2,8 @@ use crate::result::Result;
 use ab_glyph::{Font, FontVec, GlyphId};
 use image::{DynamicImage, Rgb};
 
-#[derive(Clone, Copy)]
-pub enum FontCode {
+#[derive(Clone, Copy, PartialEq)]
+pub enum Code {
     Cmr,
     Lmr,
     Qag,
@@ -12,14 +12,14 @@ pub enum FontCode {
     Xits,
 }
 
-fn code_to_path(code: FontCode) -> &'static str {
+fn code_to_path(code: Code) -> &'static str {
     match code {
-        FontCode::Lmr => "fonts/lmr",
-        FontCode::Cmr => "fonts/cmr",
-        FontCode::Qag => "fonts/qag",
-        FontCode::Qcr => "fonts/qcr",
-        FontCode::Qpl => "fonts/qpl",
-        FontCode::Xits => "fonts/xits",
+        Code::Lmr => "fonts/lmr",
+        Code::Cmr => "fonts/cmr",
+        Code::Qag => "fonts/qag",
+        Code::Qcr => "fonts/qcr",
+        Code::Qpl => "fonts/qpl",
+        Code::Xits => "fonts/xits",
     }
 }
 
@@ -79,6 +79,7 @@ fn path_to_styles(path: &str) -> Vec<Style> {
 #[derive(Clone)]
 pub struct FontGlyph {
     pub chr: char,
+    pub code: Code,
     pub size: Size,
     pub styles: Vec<Style>,
     pub image: Vec<u8>,
@@ -89,30 +90,31 @@ impl FontGlyph {
         font: &FontVec,
         id: GlyphId,
         chr: char,
+        code: Code,
         size: Size,
         styles: Vec<Style>,
     ) -> FontGlyph {
-        let mut image = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
-
         // TODO: improve scale
         let pt = size_to_pt(size);
         let scale = font.pt_to_px_scale(pt * 300.0 / 96.0 + 3.0).unwrap();
         let glyph = id.with_scale(scale);
 
+        let mut glyph_image = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
         if let Some(outlined) = font.outline_glyph(glyph) {
             outlined.draw(|x, y, v| {
                 if x < 64 && y < 64 {
                     let c = (255.0 - v * 255.0) as u8;
-                    image.put_pixel(x, y, Rgb([c, c, c]))
+                    glyph_image.put_pixel(x, y, Rgb([c, c, c]))
                 }
             })
         }
 
         FontGlyph {
             chr,
+            code,
             size,
             styles,
-            image: DynamicImage::ImageRgb8(image).to_luma8().into_raw(),
+            image: DynamicImage::ImageRgb8(glyph_image).to_luma8().into_raw(),
         }
     }
 
@@ -130,38 +132,35 @@ impl FontGlyph {
     }
 }
 
-#[derive(Clone)]
 pub struct FontFamily {
-    pub code: FontCode,
     pub glyphs: Vec<FontGlyph>,
 }
 
 impl FontFamily {
-    fn load_font(path: &str) -> Result<Vec<FontGlyph>> {
+    fn load_file(path: &str, code: Code) -> Result<Vec<FontGlyph>> {
         let font = FontVec::try_from_vec(std::fs::read(path)?)?;
         let sizes = [Size::Small, Size::Normalsize, Size::Large, Size::Huge];
         let styles = path_to_styles(path);
 
         let mut glyphs = Vec::new();
         for size in sizes {
-            glyphs
-                .extend(font.codepoint_ids().map(|(id, chr)| {
-                    FontGlyph::from(&font, id, chr, size.clone(), styles.clone())
-                }));
+            glyphs.extend(font.codepoint_ids().map(|(id, chr)| {
+                FontGlyph::from(&font, id, chr, code, size.clone(), styles.clone())
+            }));
         }
 
         Ok(glyphs)
     }
 
-    pub fn from_code(code: FontCode) -> Result<FontFamily> {
-        let fonts = std::fs::read_dir(code_to_path(code))?;
+    pub fn from_code(code: Code) -> Result<FontFamily> {
+        let files = std::fs::read_dir(code_to_path(code))?;
 
         let mut glyphs = Vec::new();
-        for font in fonts {
-            let path = font?.path();
-            glyphs.extend(FontFamily::load_font(path.to_str().unwrap())?);
+        for file in files {
+            let path = file?.path();
+            glyphs.extend(FontFamily::load_file(&path.to_string_lossy(), code)?);
         }
 
-        Ok(FontFamily { code, glyphs })
+        Ok(FontFamily { glyphs })
     }
 }

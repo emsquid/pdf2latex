@@ -165,6 +165,15 @@ impl Word {
             glyphs: Word::find_glyphs(rect, image),
         }
     }
+
+    pub fn guess(&self, family: &FontFamily) -> String {
+        let mut content = String::new();
+        for glyph in self.glyphs.iter() {
+            content.push(glyph.guess(family).chr);
+        }
+
+        content
+    }
 }
 
 #[derive(Clone)]
@@ -191,5 +200,15 @@ impl Line {
             rect,
             words: Line::find_words(rect, image),
         }
+    }
+
+    pub fn guess(&self, family: &FontFamily) -> String {
+        let mut content = String::new();
+        for word in self.words.iter() {
+            content.push_str(&word.guess(family));
+            content.push(' ');
+        }
+
+        content
     }
 }
