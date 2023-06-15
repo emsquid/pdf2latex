@@ -61,7 +61,7 @@ impl Char {
     }
 
     pub fn get_glyph(&self, image: &DynamicImage) -> Vec<u8> {
-        let mut bottom = image::RgbImage::from_pixel(32, 32, Rgb([255, 255, 255]));
+        let mut bottom = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
         let top = self.rect.crop(image).to_rgb8();
         overlay(&mut bottom, &top, 0, 0);
 
@@ -75,11 +75,9 @@ impl Char {
 
         for glyph in family.glyphs.iter() {
             // TODO: temporary fix
-            if glyph.chr.is_ascii() {
-                let dist = squared_distance(&reference, &glyph.image);
-                if dist < closest.1 {
-                    closest = (glyph.clone(), dist);
-                }
+            let dist = squared_distance(&reference, &glyph.image);
+            if dist < closest.1 {
+                closest = (glyph.clone(), dist);
             }
         }
 

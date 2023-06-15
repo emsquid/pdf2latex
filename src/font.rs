@@ -4,16 +4,26 @@ use image::{DynamicImage, Rgb};
 
 #[derive(Clone, Copy)]
 pub enum FontCode {
+    Cmr,
     Lmr,
+    Qag,
+    Qcr,
+    Qpl,
+    Xits,
 }
 
 fn code_to_path(code: FontCode) -> &'static str {
     match code {
         FontCode::Lmr => "fonts/lmr",
+        FontCode::Cmr => "fonts/cmr",
+        FontCode::Qag => "fonts/qag",
+        FontCode::Qcr => "fonts/qcr",
+        FontCode::Qpl => "fonts/qpl",
+        FontCode::Xits => "fonts/xits",
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Size {
     Tiny,
     Scriptsize,
@@ -42,7 +52,7 @@ fn size_to_pt(size: Size) -> f32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Style {
     Bold,
     Italic,
@@ -76,7 +86,7 @@ pub struct Glyph {
 
 impl Glyph {
     pub fn from(font: &FontVec, id: GlyphId, chr: char, size: Size, styles: Vec<Style>) -> Glyph {
-        let mut image = image::RgbImage::from_pixel(32, 32, Rgb([255, 255, 255]));
+        let mut image = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
 
         let pt = size_to_pt(size);
         let scale = font.pt_to_px_scale(pt * 300.0 / 96.0 + 3.0).unwrap();
@@ -84,7 +94,7 @@ impl Glyph {
 
         if let Some(outlined) = font.outline_glyph(glyph) {
             outlined.draw(|x, y, v| {
-                if x < 32 && y < 32 {
+                if x < 64 && y < 64 {
                     let c = (255.0 - v * 255.0) as u8;
                     image.put_pixel(x, y, Rgb([c, c, c]))
                 }
@@ -103,8 +113,8 @@ impl Glyph {
         image::save_buffer_with_format(
             path,
             &self.image,
-            32,
-            32,
+            64,
+            64,
             image::ColorType::L8,
             image::ImageFormat::Png,
         )?;
