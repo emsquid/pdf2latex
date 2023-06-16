@@ -1,10 +1,9 @@
-use std::process::exit;
-
-use crate::result::Result;
+use crate::{result::Result, utils::Rect};
 use ab_glyph::{Font, FontVec, GlyphId};
-use image::{DynamicImage, Rgb};
+use image::{DynamicImage, Rgb, RgbImage};
+use std::collections::HashMap;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum Code {
     Cmr,
     Lmr,
@@ -25,7 +24,7 @@ fn code_to_path(code: Code) -> &'static str {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Size {
     Tiny,
     Scriptsize,
@@ -54,12 +53,12 @@ fn size_to_pt(size: Size) -> f32 {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Style {
     Bold,
     Italic,
     Slanted,
-    Underlined,
+    // Underlined,
 }
 
 fn path_to_styles(path: &str) -> Vec<Style> {
@@ -84,6 +83,7 @@ pub struct FontGlyph {
     pub code: Code,
     pub size: Size,
     pub styles: Vec<Style>,
+    pub rect: Rect,
     pub image: Vec<u8>,
 }
 
@@ -98,18 +98,18 @@ impl FontGlyph {
     ) -> Option<FontGlyph> {
         // TODO: improve scale
         let pt = size_to_pt(size);
-        let scale = font.pt_to_px_scale(pt * 300.0 / 96.0 + 3.0).unwrap();
+        let scale = font.pt_to_px_scale(pt * 300.0 / 96.0 + 3.5).unwrap();
         let glyph = id.with_scale(scale);
 
         if let Some(outlined) = font.outline_glyph(glyph) {
             let bounds = outlined.px_bounds();
-            let w_h = bounds.max - bounds.min;
-            let max = f32::max(w_h.x, w_h.y) as u32;
+            let point = bounds.max - bounds.min;
+            let rect = Rect::new(0, 0, point.x as u32, point.y as u32);
 
-            let mut glyph_image = image::RgbImage::from_pixel(max, max, Rgb([255, 255, 255]));
+            let mut image = RgbImage::from_pixel(rect.width, rect.height, Rgb([255, 255, 255]));
             outlined.draw(|x, y, v| {
                 let c = (255.0 - v * 255.0) as u8;
-                glyph_image.put_pixel(x, y, Rgb([c, c, c]))
+                image.put_pixel(x, y, Rgb([c, c, c]))
             });
 
             Some(FontGlyph {
@@ -117,7 +117,8 @@ impl FontGlyph {
                 code,
                 size,
                 styles,
-                image: DynamicImage::ImageRgb8(glyph_image).to_luma8().into_raw(),
+                rect,
+                image: DynamicImage::ImageRgb8(image).to_luma8().into_raw(),
             })
         } else {
             None
@@ -128,8 +129,8 @@ impl FontGlyph {
         image::save_buffer_with_format(
             path,
             &self.image,
-            64,
-            64,
+            self.rect.width,
+            self.rect.height,
             image::ColorType::L8,
             image::ImageFormat::Png,
         )?;
@@ -138,21 +139,33 @@ impl FontGlyph {
     }
 }
 
-pub struct FontFamily {
-    pub glyphs: Vec<FontGlyph>,
+pub struct FontBase {
+    pub glyphs: HashMap<Code, HashMap<(u32, u32), Vec<FontGlyph>>>,
 }
 
-impl FontFamily {
-    fn load_file(path: &str, code: Code) -> Result<Vec<FontGlyph>> {
+impl FontBase {
+    fn load_file(path: &str, code: Code) -> Result<HashMap<(u32, u32), Vec<FontGlyph>>> {
         let font = FontVec::try_from_vec(std::fs::read(path)?)?;
-        let sizes = [Size::Small, Size::Normalsize, Size::Large, Size::Huge];
+        let sizes = [
+            Size::Tiny,
+            Size::Scriptsize,
+            Size::Footnotesize,
+            Size::Small,
+            Size::Normalsize,
+            Size::Large,
+            Size::LLarge,
+            Size::LLLarge,
+            Size::Huge,
+            Size::HHuge,
+        ];
         let styles = path_to_styles(path);
 
-        let mut glyphs = Vec::new();
+        let mut glyphs = HashMap::new();
         for size in sizes {
             for (id, chr) in font.codepoint_ids() {
                 if let Some(glyph) = FontGlyph::from(&font, id, chr, code, size, styles.clone()) {
-                    glyphs.push(glyph);
+                    let key = (glyph.rect.width, glyph.rect.height);
+                    glyphs.entry(key).or_insert(Vec::new()).push(glyph);
                 }
             }
         }
@@ -160,15 +173,35 @@ impl FontFamily {
         Ok(glyphs)
     }
 
-    pub fn from_code(code: Code) -> Result<FontFamily> {
+    fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<FontGlyph>>> {
         let files = std::fs::read_dir(code_to_path(code))?;
 
-        let mut glyphs = Vec::new();
+        let mut family = HashMap::new();
         for file in files {
             let path = file?.path();
-            glyphs.extend(FontFamily::load_file(&path.to_string_lossy(), code)?);
+            for (key, glyphs) in FontBase::load_file(&path.to_string_lossy(), code)? {
+                family.entry(key).or_insert(Vec::new()).extend(glyphs);
+            }
         }
 
-        Ok(FontFamily { glyphs })
+        Ok(family)
+    }
+
+    pub fn new() -> Result<FontBase> {
+        let codes = [
+            Code::Cmr,
+            Code::Lmr,
+            Code::Qag,
+            Code::Qcr,
+            Code::Qpl,
+            Code::Xits,
+        ];
+
+        let mut glyphs = HashMap::new();
+        for code in codes {
+            glyphs.insert(code, FontBase::load_family(code)?);
+        }
+
+        Ok(FontBase { glyphs })
     }
 }

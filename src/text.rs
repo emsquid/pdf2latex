@@ -1,33 +1,10 @@
-use crate::font::{FontFamily, FontGlyph};
+use crate::font::{FontBase, FontGlyph};
 use crate::result::Result;
-use crate::utils::{find_parts, flood_fill, squared_distance};
-use image::{DynamicImage, GenericImageView, Pixel, Rgb};
+use crate::utils::{distance, find_parts, flood_fill, Rect};
+use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 
-const WORD_SPACING: u32 = 7;
+const WORD_SPACING: u32 = 10;
 const CHAR_THRESHOLD: u8 = 175;
-
-#[derive(Clone, Copy, Debug)]
-pub struct Rect {
-    pub x: u32,
-    pub y: u32,
-    pub width: u32,
-    pub height: u32,
-}
-
-impl Rect {
-    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Rect {
-        Rect {
-            x,
-            y,
-            width,
-            height,
-        }
-    }
-
-    pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
-        image.crop_imm(self.x, self.y, self.width, self.height)
-    }
-}
 
 #[derive(Clone)]
 pub struct UnknownGlyph {
@@ -40,13 +17,9 @@ impl UnknownGlyph {
         let base_pixels = flood_fill(vec![start], &bounds.crop(image).to_luma8(), CHAR_THRESHOLD);
 
         let x = base_pixels.iter().map(|(x, _)| *x).min().unwrap();
-        let width = base_pixels
-            .iter()
-            .map(|(px, _)| px.saturating_sub(x) + 1)
-            .max()
-            .unwrap();
+        let width = base_pixels.iter().map(|(px, _)| px - x + 1).max().unwrap();
 
-        Rect::new(bounds.x + x - 2, bounds.y, width + 4, bounds.height)
+        Rect::new(bounds.x + x - 3, bounds.y, width + 6, bounds.height)
     }
 
     fn find_pixels(base: Rect, image: &DynamicImage) -> Vec<(u32, u32)> {
@@ -81,19 +54,10 @@ impl UnknownGlyph {
 
         let x = pixels.iter().map(|(x, _)| *x).min().unwrap();
         let y = pixels.iter().map(|(_, y)| *y).min().unwrap();
-        let width = pixels
-            .iter()
-            .map(|(px, _)| px.saturating_sub(x) + 1)
-            .max()
-            .unwrap();
-        let height = pixels
-            .iter()
-            .map(|(_, py)| py.saturating_sub(y) + 1)
-            .max()
-            .unwrap();
-        let max = u32::max(width, height);
+        let width = pixels.iter().map(|(px, _)| px - x + 1).max().unwrap();
+        let height = pixels.iter().map(|(_, py)| py - y + 1).max().unwrap();
 
-        let mut glyph_image = image::RgbImage::from_pixel(max, max, Rgb([255, 255, 255]));
+        let mut glyph_image = RgbImage::from_pixel(width, height, Rgb([255, 255, 255]));
         for (px, py) in pixels.iter() {
             let color = image.get_pixel(*px, *py).to_rgb();
             glyph_image.put_pixel(px - x, py - y, color)
@@ -105,14 +69,21 @@ impl UnknownGlyph {
         }
     }
 
-    pub fn guess(&self, family: &FontFamily) -> FontGlyph {
-        let mut closest = (family.glyphs[0].clone(), std::f32::MAX);
-        for glyph in family.glyphs.iter() {
-            let delta = f32::sqrt(glyph.image.len() as f32) - f32::sqrt(self.image.len() as f32);
-            if delta >= -4.0 && delta <= 4.0 {
-                let dist = squared_distance(&self.image, &glyph.image);
-                if dist < closest.1 {
-                    closest = (glyph.clone(), dist);
+    pub fn guess(&self, base: &FontBase) -> Option<FontGlyph> {
+        let mut closest = (None, u32::MAX);
+        for family in base.glyphs.values() {
+            for dw in -2..=2 {
+                for dh in -2..=2 {
+                    let width = self.rect.width.saturating_add_signed(dw);
+                    let height = self.rect.height.saturating_add_signed(dh);
+                    if let Some(glyphs) = family.get(&(width, height)) {
+                        for glyph in glyphs {
+                            let dist = distance(&self, &glyph);
+                            if dist < closest.1 {
+                                closest = (Some(glyph.clone()), dist);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -124,8 +95,8 @@ impl UnknownGlyph {
         image::save_buffer_with_format(
             path,
             &self.image,
-            64,
-            64,
+            self.rect.width,
+            self.rect.height,
             image::ColorType::L8,
             image::ImageFormat::Png,
         )?;
@@ -168,10 +139,14 @@ impl Word {
         }
     }
 
-    pub fn guess(&self, family: &FontFamily) -> String {
+    pub fn guess(&self, base: &FontBase) -> String {
         let mut content = String::new();
         for glyph in self.glyphs.iter() {
-            content.push(glyph.guess(family).chr);
+            if let Some(glyph) = glyph.guess(base) {
+                content.push(glyph.chr);
+            } else {
+                content.push(' ');
+            }
         }
 
         content
@@ -204,10 +179,10 @@ impl Line {
         }
     }
 
-    pub fn guess(&self, family: &FontFamily) -> String {
+    pub fn guess(&self, base: &FontBase) -> String {
         let mut content = String::new();
         for word in self.words.iter() {
-            content.push_str(&word.guess(family));
+            content.push_str(&word.guess(base));
             content.push(' ');
         }
 

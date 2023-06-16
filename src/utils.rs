@@ -1,6 +1,33 @@
-use crate::result::{Error, Result};
+use crate::{
+    font::FontGlyph,
+    result::{Error, Result},
+    text::UnknownGlyph,
+};
 use image::{DynamicImage, GrayImage};
 use std::process::Command;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Rect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Rect {
+    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Rect {
+        Rect {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
+    pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
+        image.crop_imm(self.x, self.y, self.width, self.height)
+    }
+}
 
 fn split(buffer: &[u8], delimiter: u8) -> Vec<&[u8]> {
     buffer.split(|&b| b == delimiter).collect()
@@ -100,24 +127,27 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
     pixels
 }
 
-pub fn squared_distance(reference: &[u8], other: &[u8]) -> f32 {
-    let size_1 = f32::sqrt(other.len() as f32) as usize;
-    let size_2 = f32::sqrt(reference.len() as f32) as usize;
-    let max = usize::max(size_1, size_2);
+pub fn distance(glyph: &UnknownGlyph, other: &FontGlyph) -> u32 {
+    let (g_rect, o_rect) = (glyph.rect, other.rect);
+    let width = u32::max(g_rect.width, o_rect.width);
+    let height = u32::max(g_rect.height, o_rect.height);
 
-    let mut dist = 0.0;
-    for x in 0..max {
-        for y in 0..max {
-            if x >= size_1 || y >= size_1 {
-                dist += (1.0 - f32::from(reference[x + y * size_2]) / 255.0).powf(2.0);
-            } else if x >= size_2 || y >= size_2 {
-                dist += (1.0 - f32::from(other[x + y * size_1]) / 255.0).powf(2.0);
-            } else {
-                let v_1 = f32::from(other[x + y * size_1]);
-                let v_2 = f32::from(reference[x + y * size_2]);
-                dist += ((v_1 - v_2) / 255.0).powf(2.0);
+    let mut dist = 0;
+    for x in 0..width {
+        for y in 0..height {
+            if x < g_rect.width && y < g_rect.height && x < o_rect.width && y < o_rect.height {
+                let v_g = u32::from(glyph.image[(x + y * g_rect.width) as usize]);
+                let v_o = u32::from(other.image[(x + y * o_rect.width) as usize]);
+                dist += (v_g - v_o).pow(2);
+            } else if x < g_rect.width && y < g_rect.height {
+                let v_g = u32::from(glyph.image[(x + y * g_rect.width) as usize]);
+                dist += (255 - v_g).pow(2);
+            } else if x < o_rect.width && y < o_rect.height {
+                let v_o = u32::from(other.image[(x + y * o_rect.width) as usize]);
+                dist += (255 - v_o).pow(2);
             }
         }
     }
+
     dist
 }

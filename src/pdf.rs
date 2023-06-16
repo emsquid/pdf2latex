@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use crate::font::{Code, FontFamily};
+use crate::font::FontBase;
 use crate::result::Result;
-use crate::text::{Line, Rect};
-use crate::utils::{find_parts, pdf_to_images};
+use crate::text::Line;
+use crate::utils::{find_parts, pdf_to_images, Rect};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgba};
 
@@ -61,11 +61,11 @@ impl Page {
     }
 
     pub fn guess(&self) -> Result<String> {
-        let family = FontFamily::from_code(Code::Lmr)?;
+        let fontbase = Arc::new(FontBase::new()?);
 
         let mut text = String::new();
         for line in self.lines.iter() {
-            text.push_str(&line.guess(&family));
+            text.push_str(&line.guess(&fontbase));
             text.push('\n');
         }
 
@@ -73,12 +73,12 @@ impl Page {
     }
 
     pub fn guess_threaded(&self) -> Result<String> {
-        let family = Arc::new(FontFamily::from_code(Code::Lmr)?);
+        let fontbase = Arc::new(FontBase::new()?);
 
         let mut handles = Vec::new();
         for line in self.lines.clone() {
-            let family = Arc::clone(&family);
-            let handle = std::thread::spawn(move || line.guess(&family));
+            let fontbase = Arc::clone(&fontbase);
+            let handle = std::thread::spawn(move || line.guess(&fontbase));
             handles.push(handle);
         }
 
