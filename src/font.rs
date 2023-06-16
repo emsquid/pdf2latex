@@ -65,20 +65,20 @@ fn path_to_styles(path: &str) -> Vec<Style> {
     let mut styles = Vec::new();
 
     if path.contains("bold") {
-        styles.push(Style::Bold)
+        styles.push(Style::Bold);
     }
     if path.contains("italic") {
-        styles.push(Style::Italic)
+        styles.push(Style::Italic);
     }
     if path.contains("slant") {
-        styles.push(Style::Slanted)
+        styles.push(Style::Slanted);
     }
 
     styles
 }
 
 #[derive(Clone)]
-pub struct FontGlyph {
+pub struct Glyph {
     pub chr: char,
     pub code: Code,
     pub size: Size,
@@ -87,7 +87,7 @@ pub struct FontGlyph {
     pub image: Vec<u8>,
 }
 
-impl FontGlyph {
+impl Glyph {
     pub fn from(
         font: &FontVec,
         id: GlyphId,
@@ -95,7 +95,7 @@ impl FontGlyph {
         code: Code,
         size: Size,
         styles: Vec<Style>,
-    ) -> Option<FontGlyph> {
+    ) -> Option<Glyph> {
         // TODO: improve scale
         let pt = size_to_pt(size);
         let scale = font.pt_to_px_scale(pt * 300.0 / 96.0 + 3.5).unwrap();
@@ -109,10 +109,10 @@ impl FontGlyph {
             let mut image = RgbImage::from_pixel(rect.width, rect.height, Rgb([255, 255, 255]));
             outlined.draw(|x, y, v| {
                 let c = (255.0 - v * 255.0) as u8;
-                image.put_pixel(x, y, Rgb([c, c, c]))
+                image.put_pixel(x, y, Rgb([c, c, c]));
             });
 
-            Some(FontGlyph {
+            Some(Glyph {
                 chr,
                 code,
                 size,
@@ -140,11 +140,11 @@ impl FontGlyph {
 }
 
 pub struct FontBase {
-    pub glyphs: HashMap<Code, HashMap<(u32, u32), Vec<FontGlyph>>>,
+    pub glyphs: HashMap<Code, HashMap<(u32, u32), Vec<Glyph>>>,
 }
 
 impl FontBase {
-    fn load_file(path: &str, code: Code) -> Result<HashMap<(u32, u32), Vec<FontGlyph>>> {
+    fn load_file(path: &str, code: Code) -> Result<HashMap<(u32, u32), Vec<Glyph>>> {
         let font = FontVec::try_from_vec(std::fs::read(path)?)?;
         let sizes = [
             Size::Tiny,
@@ -163,7 +163,7 @@ impl FontBase {
         let mut glyphs = HashMap::new();
         for size in sizes {
             for (id, chr) in font.codepoint_ids() {
-                if let Some(glyph) = FontGlyph::from(&font, id, chr, code, size, styles.clone()) {
+                if let Some(glyph) = Glyph::from(&font, id, chr, code, size, styles.clone()) {
                     let key = (glyph.rect.width, glyph.rect.height);
                     glyphs.entry(key).or_insert(Vec::new()).push(glyph);
                 }
@@ -173,7 +173,7 @@ impl FontBase {
         Ok(glyphs)
     }
 
-    fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<FontGlyph>>> {
+    fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<Glyph>>> {
         let files = std::fs::read_dir(code_to_path(code))?;
 
         let mut family = HashMap::new();

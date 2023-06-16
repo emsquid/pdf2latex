@@ -16,15 +16,13 @@ pub struct Page {
 
 impl Page {
     fn find_lines(image: &DynamicImage) -> Vec<Line> {
-        let lines = find_parts(image.to_luma8(), LINE_SPACING)
+        find_parts(&image.to_luma8(), LINE_SPACING)
             .into_iter()
             .map(|(start, end)| {
                 let rect = Rect::new(0, start, image.width(), end - start + 1);
                 Line::new(rect, image)
             })
-            .collect();
-
-        lines
+            .collect()
     }
 
     pub fn from(image: &DynamicImage) -> Page {
@@ -37,12 +35,13 @@ impl Page {
     pub fn debug(&self) -> DynamicImage {
         let mut copy = self.image.clone();
         let mut alt = true;
-        for line in self.lines.iter() {
-            for word in line.words.iter() {
-                for glyph in word.glyphs.iter() {
-                    let color = match alt {
-                        true => Rgba([0, 0, 255, 255]),
-                        false => Rgba([0, 255, 0, 255]),
+        for line in &self.lines {
+            for word in &line.words {
+                for glyph in &word.glyphs {
+                    let color = if alt {
+                        Rgba([0, 0, 255, 255])
+                    } else {
+                        Rgba([0, 255, 0, 255])
                     };
                     alt = !alt;
                     let sub = image::RgbaImage::from_pixel(glyph.rect.width, 2, color);
@@ -64,7 +63,7 @@ impl Page {
         let fontbase = Arc::new(FontBase::new()?);
 
         let mut text = String::new();
-        for line in self.lines.iter() {
+        for line in &self.lines {
             text.push_str(&line.guess(&fontbase));
             text.push('\n');
         }
@@ -98,10 +97,7 @@ pub struct Pdf {
 
 impl Pdf {
     pub fn load(path: &str) -> Result<Pdf> {
-        let pages = pdf_to_images(path, 300)?
-            .iter()
-            .map(|image| Page::from(image))
-            .collect();
+        let pages = pdf_to_images(path, 300)?.iter().map(Page::from).collect();
 
         Ok(Pdf { pages })
     }

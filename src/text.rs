@@ -1,4 +1,4 @@
-use crate::font::{FontBase, FontGlyph};
+use crate::font::{FontBase, Glyph};
 use crate::result::Result;
 use crate::utils::{distance, find_parts, flood_fill, Rect};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
@@ -29,7 +29,7 @@ impl UnknownGlyph {
         for x in [0, base.width - 1] {
             for y in 0..base.height {
                 if gray[(x, y)].0[0] < 255 {
-                    borders.push((x, y))
+                    borders.push((x, y));
                 }
             }
         }
@@ -58,9 +58,9 @@ impl UnknownGlyph {
         let height = pixels.iter().map(|(_, py)| py - y + 1).max().unwrap();
 
         let mut glyph_image = RgbImage::from_pixel(width, height, Rgb([255, 255, 255]));
-        for (px, py) in pixels.iter() {
+        for (px, py) in &pixels {
             let color = image.get_pixel(*px, *py).to_rgb();
-            glyph_image.put_pixel(px - x, py - y, color)
+            glyph_image.put_pixel(px - x, py - y, color);
         }
 
         UnknownGlyph {
@@ -69,7 +69,7 @@ impl UnknownGlyph {
         }
     }
 
-    pub fn guess(&self, base: &FontBase) -> Option<FontGlyph> {
+    pub fn guess(&self, base: &FontBase) -> Option<Glyph> {
         let mut closest = (None, u32::MAX);
         for family in base.glyphs.values() {
             for dw in -2..=2 {
@@ -78,7 +78,7 @@ impl UnknownGlyph {
                     let height = self.rect.height.saturating_add_signed(dh);
                     if let Some(glyphs) = family.get(&(width, height)) {
                         for glyph in glyphs {
-                            let dist = distance(&self, &glyph);
+                            let dist = distance(self, glyph);
                             if dist < closest.1 {
                                 closest = (Some(glyph.clone()), dist);
                             }
@@ -141,7 +141,7 @@ impl Word {
 
     pub fn guess(&self, base: &FontBase) -> String {
         let mut content = String::new();
-        for glyph in self.glyphs.iter() {
+        for glyph in &self.glyphs {
             if let Some(glyph) = glyph.guess(base) {
                 content.push(glyph.chr);
             } else {
@@ -161,15 +161,13 @@ pub struct Line {
 
 impl Line {
     fn find_words(bounds: Rect, image: &DynamicImage) -> Vec<Word> {
-        let words = find_parts(bounds.crop(image).rotate90().to_luma8(), WORD_SPACING)
+        find_parts(&bounds.crop(image).rotate90().to_luma8(), WORD_SPACING)
             .into_iter()
             .map(|(start, end)| {
                 let rect = Rect::new(bounds.x + start, bounds.y, end - start + 1, bounds.height);
                 Word::new(rect, image)
             })
-            .collect();
-
-        words
+            .collect()
     }
 
     pub fn new(rect: Rect, image: &DynamicImage) -> Line {
@@ -181,7 +179,7 @@ impl Line {
 
     pub fn guess(&self, base: &FontBase) -> String {
         let mut content = String::new();
-        for word in self.words.iter() {
+        for word in &self.words {
             content.push_str(&word.guess(base));
             content.push(' ');
         }

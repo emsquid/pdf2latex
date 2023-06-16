@@ -1,5 +1,5 @@
 use crate::{
-    font::FontGlyph,
+    font::Glyph,
     result::{Error, Result},
     text::UnknownGlyph,
 };
@@ -66,7 +66,7 @@ pub fn pdf_to_images(path: &str, resolution: u32) -> Result<Vec<DynamicImage>> {
     }
 }
 
-pub fn find_parts(gray: GrayImage, spacing: u32) -> Vec<(u32, u32)> {
+pub fn find_parts(gray: &GrayImage, spacing: u32) -> Vec<(u32, u32)> {
     let mut parts = Vec::new();
 
     let mut start = 0;
@@ -91,7 +91,7 @@ pub fn find_parts(gray: GrayImage, spacing: u32) -> Vec<(u32, u32)> {
     }
 
     if start != 0 {
-        parts.push((start, gray.height()))
+        parts.push((start, gray.height()));
     }
 
     parts
@@ -127,7 +127,7 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
     pixels
 }
 
-pub fn distance(glyph: &UnknownGlyph, other: &FontGlyph) -> u32 {
+pub fn distance(glyph: &UnknownGlyph, other: &Glyph) -> u32 {
     let (g_rect, o_rect) = (glyph.rect, other.rect);
     let width = u32::max(g_rect.width, o_rect.width);
     let height = u32::max(g_rect.height, o_rect.height);
