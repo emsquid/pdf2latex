@@ -101,10 +101,23 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
 }
 
 pub fn squared_distance(reference: &[u8], other: &[u8]) -> f32 {
+    let size_1 = f32::sqrt(other.len() as f32) as usize;
+    let size_2 = f32::sqrt(reference.len() as f32) as usize;
+    let max = usize::max(size_1, size_2);
+
     let mut dist = 0.0;
-    for i in 0..reference.len() {
-        let (x_1, x_2) = (i16::from(other[i]), i16::from(reference[i]));
-        dist += (f32::from(x_1 - x_2) / 255.0).powf(2.0);
+    for x in 0..max {
+        for y in 0..max {
+            if x >= size_1 || y >= size_1 {
+                dist += (1.0 - f32::from(reference[x + y * size_2]) / 255.0).powf(2.0);
+            } else if x >= size_2 || y >= size_2 {
+                dist += (1.0 - f32::from(other[x + y * size_1]) / 255.0).powf(2.0);
+            } else {
+                let v_1 = f32::from(other[x + y * size_1]);
+                let v_2 = f32::from(reference[x + y * size_2]);
+                dist += ((v_1 - v_2) / 255.0).powf(2.0);
+            }
+        }
     }
     dist
 }

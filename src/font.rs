@@ -1,3 +1,5 @@
+use std::process::exit;
+
 use crate::result::Result;
 use ab_glyph::{Font, FontVec, GlyphId};
 use image::{DynamicImage, Rgb};
@@ -93,28 +95,32 @@ impl FontGlyph {
         code: Code,
         size: Size,
         styles: Vec<Style>,
-    ) -> FontGlyph {
+    ) -> Option<FontGlyph> {
         // TODO: improve scale
         let pt = size_to_pt(size);
         let scale = font.pt_to_px_scale(pt * 300.0 / 96.0 + 3.0).unwrap();
         let glyph = id.with_scale(scale);
 
-        let mut glyph_image = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
         if let Some(outlined) = font.outline_glyph(glyph) {
-            outlined.draw(|x, y, v| {
-                if x < 64 && y < 64 {
-                    let c = (255.0 - v * 255.0) as u8;
-                    glyph_image.put_pixel(x, y, Rgb([c, c, c]))
-                }
-            })
-        }
+            let bounds = outlined.px_bounds();
+            let w_h = bounds.max - bounds.min;
+            let max = f32::max(w_h.x, w_h.y) as u32;
 
-        FontGlyph {
-            chr,
-            code,
-            size,
-            styles,
-            image: DynamicImage::ImageRgb8(glyph_image).to_luma8().into_raw(),
+            let mut glyph_image = image::RgbImage::from_pixel(max, max, Rgb([255, 255, 255]));
+            outlined.draw(|x, y, v| {
+                let c = (255.0 - v * 255.0) as u8;
+                glyph_image.put_pixel(x, y, Rgb([c, c, c]))
+            });
+
+            Some(FontGlyph {
+                chr,
+                code,
+                size,
+                styles,
+                image: DynamicImage::ImageRgb8(glyph_image).to_luma8().into_raw(),
+            })
+        } else {
+            None
         }
     }
 
@@ -144,9 +150,11 @@ impl FontFamily {
 
         let mut glyphs = Vec::new();
         for size in sizes {
-            glyphs.extend(font.codepoint_ids().map(|(id, chr)| {
-                FontGlyph::from(&font, id, chr, code, size.clone(), styles.clone())
-            }));
+            for (id, chr) in font.codepoint_ids() {
+                if let Some(glyph) = FontGlyph::from(&font, id, chr, code, size, styles.clone()) {
+                    glyphs.push(glyph);
+                }
+            }
         }
 
         Ok(glyphs)

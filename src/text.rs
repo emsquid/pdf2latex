@@ -91,13 +91,12 @@ impl UnknownGlyph {
             .map(|(_, py)| py.saturating_sub(y) + 1)
             .max()
             .unwrap();
+        let max = u32::max(width, height);
 
-        let mut glyph_image = image::RgbImage::from_pixel(64, 64, Rgb([255, 255, 255]));
+        let mut glyph_image = image::RgbImage::from_pixel(max, max, Rgb([255, 255, 255]));
         for (px, py) in pixels.iter() {
-            if px - x < 64 && py - y < 64 {
-                let color = image.get_pixel(*px, *py).to_rgb();
-                glyph_image.put_pixel(px - x, py - y, color)
-            }
+            let color = image.get_pixel(*px, *py).to_rgb();
+            glyph_image.put_pixel(px - x, py - y, color)
         }
 
         UnknownGlyph {
@@ -109,9 +108,12 @@ impl UnknownGlyph {
     pub fn guess(&self, family: &FontFamily) -> FontGlyph {
         let mut closest = (family.glyphs[0].clone(), std::f32::MAX);
         for glyph in family.glyphs.iter() {
-            let dist = squared_distance(&self.image, &glyph.image);
-            if dist < closest.1 {
-                closest = (glyph.clone(), dist);
+            let delta = f32::sqrt(glyph.image.len() as f32) - f32::sqrt(self.image.len() as f32);
+            if delta >= -4.0 && delta <= 4.0 {
+                let dist = squared_distance(&self.image, &glyph.image);
+                if dist < closest.1 {
+                    closest = (glyph.clone(), dist);
+                }
             }
         }
 
