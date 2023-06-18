@@ -1,8 +1,4 @@
-use crate::{
-    font::Glyph,
-    result::{Error, Result},
-    text::UnknownGlyph,
-};
+use crate::result::{Error, Result};
 use image::{DynamicImage, GrayImage};
 use std::process::Command;
 
@@ -33,19 +29,19 @@ fn split(buffer: &[u8], delimiter: u8) -> Vec<&[u8]> {
     buffer.split(|&b| b == delimiter).collect()
 }
 
-fn parse_to_usize(buffer: &[u8]) -> Result<usize> {
+fn buffer_to_usize(buffer: &[u8]) -> Result<usize> {
     let result = String::from_utf8_lossy(buffer).parse()?;
     Ok(result)
 }
 
-fn parse_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
+fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
     let mut images = Vec::new();
     let mut start = 0;
 
     while start < buffer.len() {
         let infos = split(&buffer[start..start + 40], b'\n');
         let (code, size, rgb) = (infos[0], split(infos[1], b' '), infos[2]);
-        let (width, height) = (parse_to_usize(size[0])?, parse_to_usize(size[1])?);
+        let (width, height) = (buffer_to_usize(size[0])?, buffer_to_usize(size[1])?);
         let size = code.len() + size.len() + rgb.len() + 10 + width * height * 3;
 
         images.push(image::load_from_memory(&buffer[start..start + size])?);
@@ -56,13 +52,13 @@ fn parse_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
     Ok(images)
 }
 
-pub fn pdf_to_images(path: &str, resolution: u32) -> Result<Vec<DynamicImage>> {
+pub fn pdf_to_images(path: &str) -> Result<Vec<DynamicImage>> {
     let output = Command::new("pdftoppm")
-        .args(["-r", &resolution.to_string(), path])
+        .args(["-r", "300", path])
         .output()?;
     match output.stderr.len() {
-        0 => parse_to_ppm(&output.stdout),
-        _ => Err(Error::Custom("Format error: This is not a PDF".to_string())),
+        0 => buffer_to_ppm(&output.stdout),
+        _ => Err(Error::Custom("Format error: This is not a PDF")),
     }
 }
 
@@ -125,29 +121,4 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
     }
 
     pixels
-}
-
-pub fn distance(glyph: &UnknownGlyph, other: &Glyph) -> u32 {
-    let (g_rect, o_rect) = (glyph.rect, other.rect);
-    let width = u32::max(g_rect.width, o_rect.width);
-    let height = u32::max(g_rect.height, o_rect.height);
-
-    let mut dist = 0;
-    for x in 0..width {
-        for y in 0..height {
-            if x < g_rect.width && y < g_rect.height && x < o_rect.width && y < o_rect.height {
-                let v_g = u32::from(glyph.image[(x + y * g_rect.width) as usize]);
-                let v_o = u32::from(other.image[(x + y * o_rect.width) as usize]);
-                dist += (v_g - v_o).pow(2);
-            } else if x < g_rect.width && y < g_rect.height {
-                let v_g = u32::from(glyph.image[(x + y * g_rect.width) as usize]);
-                dist += (255 - v_g).pow(2);
-            } else if x < o_rect.width && y < o_rect.height {
-                let v_o = u32::from(other.image[(x + y * o_rect.width) as usize]);
-                dist += (255 - v_o).pow(2);
-            }
-        }
-    }
-
-    dist
 }

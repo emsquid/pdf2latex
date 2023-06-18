@@ -9,7 +9,7 @@ pub enum Error {
     /// Font error
     Font(ab_glyph::InvalidFont),
     /// Custom error
-    Custom(String),
+    Custom(&'static str),
 }
 
 impl std::fmt::Display for Error {
