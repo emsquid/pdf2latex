@@ -4,6 +4,7 @@ use crate::text::Line;
 use crate::utils::{find_parts, pdf_to_images, Rect};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgba};
+use latex::{Document, DocumentClass, Element, PreambleElement};
 
 const LINE_SPACING: u32 = 5;
 

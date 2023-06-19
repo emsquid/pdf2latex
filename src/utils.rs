@@ -125,10 +125,9 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
 
 pub fn average<T: Eq + Hash>(list: Vec<T>) -> T {
     let mut count = HashMap::new();
-
-    for v in list {
-        count.entry(v).or_insert(0).add_assign(1);
+    for key in list {
+        count.entry(key).or_insert(0).add_assign(1);
     }
 
-    count.into_iter().max_by_key(|(_, c)| c.clone()).unwrap().0
+    count.into_iter().max_by_key(|(_, c)| *c).unwrap().0
 }

@@ -1,5 +1,6 @@
 mod font;
 mod glyph;
+mod latex;
 mod pdf;
 mod result;
 mod text;
@@ -10,8 +11,8 @@ fn process(path: &str) -> result::Result<()> {
     file.guess()?;
 
     // file.pages[0].lines[1].words[0].glyphs[0].save("test/debug1.png")?;
-    file.pages[0].debug().save("test/debug.png")?;
-    println!("{}", file.pages[0].get_content());
+    // file.pages[0].debug().save("test/debug.png")?;
+    // println!("{}", file.latex());
 
     Ok(())
 }

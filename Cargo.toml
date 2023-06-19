@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 ab_glyph = "0.2.21"
 image = "0.24.6"
+latex = "0.3.1"
 unicode-general-category = "0.6.0"

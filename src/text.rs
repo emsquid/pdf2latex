@@ -56,10 +56,7 @@ impl Word {
         let (a_code, a_size) = (average(codes), average(sizes));
 
         for glyph in &mut self.glyphs {
-            glyph.guess(
-                fontbase,
-                Some((a_code, a_size, glyph.guess.clone().unwrap())),
-            );
+            glyph.guess(fontbase, Some((a_code, a_size)));
         }
     }
 

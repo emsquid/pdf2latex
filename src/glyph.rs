@@ -162,13 +162,13 @@ impl Unknown {
         dist
     }
 
-    pub fn guess(&mut self, fontbase: &FontBase, hint: Option<(Code, Size, Known)>) {
+    pub fn guess(&mut self, fontbase: &FontBase, hint: Option<(Code, Size)>) {
         let (mut code, mut size) = (None, None);
         let mut closest = u32::MAX;
 
-        if let Some((h_code, h_size, h_known)) = hint {
+        if let (Some((h_code, h_size)), Some(known)) = (hint, &self.guess) {
             (code, size) = (Some(h_code), Some(h_size));
-            closest = self.distance(&h_known) * 105 / 100;
+            closest = self.distance(&known) * 105 / 100;
         }
 
         for (key, family) in &fontbase.glyphs {
@@ -181,11 +181,11 @@ impl Unknown {
                     let height = self.rect.height.saturating_add_signed(dh);
                     if let Some(glyphs) = family.get(&(width, height)) {
                         for glyph in glyphs {
-                            if size != None && glyph.size != size.unwrap() {
+                            if size.is_some() && glyph.size != size.unwrap() {
                                 continue;
                             }
                             let dist = self.distance(glyph);
-                            if dist <= closest {
+                            if glyph.chr.is_ascii() && dist <= closest {
                                 closest = dist;
                                 self.guess = Some(glyph.clone());
                             }
