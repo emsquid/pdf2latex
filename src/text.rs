@@ -1,4 +1,4 @@
-use crate::font::{Code, FontBase, Size};
+use crate::font::{Code, FontBase, Size, Style};
 use crate::glyph;
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
@@ -39,8 +39,9 @@ impl Word {
     }
 
     pub fn guess(&mut self, fontbase: &FontBase) {
+        let length = self.glyphs.len();
         for glyph in &mut self.glyphs {
-            glyph.guess(fontbase, None);
+            glyph.guess(fontbase, None, length);
         }
 
         let codes = self
@@ -59,6 +60,7 @@ impl Word {
             glyph.guess(
                 fontbase,
                 Some((a_code, a_size, glyph.guess.clone().unwrap())),
+                length
             );
         }
     }
@@ -67,7 +69,12 @@ impl Word {
         let mut content = String::new();
         for glyph in &self.glyphs {
             if let Some(guess) = &glyph.guess {
+                if !guess.chr.is_ascii() { content.push_str("\x1b[31m"); }
+                if guess.styles.contains(&Style::Bold) { content.push_str("\x1b[1m"); }
+                if guess.styles.contains(&Style::Italic) { content.push_str("\x1b[3m"); }
+                if guess.styles.contains(&Style::Slanted) { content.push_str("\x1b[3;4m"); }
                 content.push(guess.chr);
+                content.push_str("\x1b[0m");
             } else {
                 content.push(' ');
             }

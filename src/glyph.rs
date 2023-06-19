@@ -5,6 +5,7 @@ use ab_glyph::{Font, FontVec, GlyphId};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 
 pub const CHAR_THRESHOLD: u8 = 175;
+const ASCII_BONUS: f32 = 0.4;
 
 #[derive(Clone)]
 pub struct Known {
@@ -134,11 +135,11 @@ impl Unknown {
         }
     }
 
-    fn distance(&self, other: &Known) -> u32 {
+    fn distance(&self, other: &Known) -> f32 {
         let width = u32::max(self.rect.width, other.rect.width);
         let height = u32::max(self.rect.height, other.rect.height);
 
-        let mut dist = 0;
+        let mut dist = 0.;
         for x in 0..width {
             for y in 0..height {
                 if x < self.rect.width
@@ -146,15 +147,15 @@ impl Unknown {
                     && x < other.rect.width
                     && y < other.rect.height
                 {
-                    let v_g = u32::from(self.image[(x + y * self.rect.width) as usize]);
-                    let v_o = u32::from(other.image[(x + y * other.rect.width) as usize]);
-                    dist += (v_g - v_o).pow(2);
+                    let v_g = f32::from(self.image[(x + y * self.rect.width) as usize]) / 255.;
+                    let v_o = f32::from(other.image[(x + y * other.rect.width) as usize]) / 255.;
+                    dist += (v_g - v_o).powf(2.);
                 } else if x < self.rect.width && y < self.rect.height {
-                    let v_g = u32::from(self.image[(x + y * self.rect.width) as usize]);
-                    dist += (255 - v_g).pow(2);
+                    let v_g = f32::from(self.image[(x + y * self.rect.width) as usize]) / 255.;
+                    dist += (1. - v_g).powf(2.);
                 } else if x < other.rect.width && y < other.rect.height {
-                    let v_o = u32::from(other.image[(x + y * other.rect.width) as usize]);
-                    dist += (255 - v_o).pow(2);
+                    let v_o = f32::from(other.image[(x + y * other.rect.width) as usize]) / 255.;
+                    dist += (1. - v_o).powf(2.);
                 }
             }
         }
@@ -162,13 +163,14 @@ impl Unknown {
         dist
     }
 
-    pub fn guess(&mut self, fontbase: &FontBase, hint: Option<(Code, Size, Known)>) {
+    pub fn guess(&mut self, fontbase: &FontBase, hint: Option<(Code, Size, Known)>, word_length: usize) {
         let (mut code, mut size) = (None, None);
-        let mut closest = u32::MAX;
-
+        let mut closest = f32::MAX;
+        
         if let Some((h_code, h_size, h_known)) = hint {
             (code, size) = (Some(h_code), Some(h_size));
-            closest = self.distance(&h_known) * 105 / 100;
+            closest = self.distance(&h_known) * 1.05;
+            if h_known.chr.is_ascii() && word_length > 1 { closest *= 1. - ASCII_BONUS; }
         }
 
         for (key, family) in &fontbase.glyphs {
@@ -184,8 +186,10 @@ impl Unknown {
                             if size != None && glyph.size != size.unwrap() {
                                 continue;
                             }
-                            let dist = self.distance(glyph);
-                            if dist <= closest {
+                            
+                            let mut dist = self.distance(glyph);
+                            if glyph.chr.is_ascii() && word_length > 1 { dist *= 1. - ASCII_BONUS; }
+                            if dist < closest {
                                 closest = dist;
                                 self.guess = Some(glyph.clone());
                             }

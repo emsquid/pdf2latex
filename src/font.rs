@@ -90,7 +90,7 @@ impl Size {
     }
 
     pub fn as_pt(&self) -> f32 {
-        let base = 11.0;
+        let base = 12.0;
         let delta = match self {
             Size::Tiny => -5.0,
             Size::Scriptsize => -3.25,
