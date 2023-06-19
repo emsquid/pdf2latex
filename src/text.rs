@@ -1,9 +1,9 @@
-use crate::font::FontBase;
+use crate::font::{Code, FontBase, Size};
 use crate::glyph;
-use crate::utils::{find_parts, Rect};
+use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
 
-const WORD_SPACING: u32 = 8;
+const WORD_SPACING: u32 = 12;
 
 pub struct Word {
     pub rect: Rect,
@@ -40,7 +40,26 @@ impl Word {
 
     pub fn guess(&mut self, fontbase: &FontBase) {
         for glyph in &mut self.glyphs {
-            glyph.guess(fontbase);
+            glyph.guess(fontbase, None);
+        }
+
+        let codes = self
+            .glyphs
+            .iter()
+            .map(|glyph| glyph.guess.clone().unwrap().code)
+            .collect::<Vec<Code>>();
+        let sizes = self
+            .glyphs
+            .iter()
+            .map(|glyph| glyph.guess.clone().unwrap().size)
+            .collect::<Vec<Size>>();
+        let (a_code, a_size) = (average(codes), average(sizes));
+
+        for glyph in &mut self.glyphs {
+            glyph.guess(
+                fontbase,
+                Some((a_code, a_size, glyph.guess.clone().unwrap())),
+            );
         }
     }
 

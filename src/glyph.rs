@@ -27,7 +27,7 @@ impl Known {
         styles: &[Style],
     ) -> Option<Known> {
         // TODO: improve scale
-        let scale = font.pt_to_px_scale(size.as_pt() * 300.0 / 96.0).unwrap();
+        let scale = font.pt_to_px_scale(size.as_pt() * 400.0 / 96.0).unwrap();
         let glyph = id.with_scale(scale);
 
         if let Some(outlined) = font.outline_glyph(glyph) {
@@ -83,7 +83,7 @@ impl Unknown {
         let x = base_pixels.iter().map(|(x, _)| *x).min().unwrap();
         let width = base_pixels.iter().map(|(px, _)| px - x + 1).max().unwrap();
 
-        Rect::new(bounds.x + x - 3, bounds.y, width + 6, bounds.height)
+        Rect::new(bounds.x + x - 5, bounds.y, width + 10, bounds.height)
     }
 
     fn find_pixels(base: Rect, image: &DynamicImage) -> Vec<(u32, u32)> {
@@ -162,26 +162,38 @@ impl Unknown {
         dist
     }
 
-    pub fn guess(&mut self, fontbase: &FontBase) {
-        let mut closest = (None, u32::MAX);
-        for family in fontbase.glyphs.values() {
+    pub fn guess(&mut self, fontbase: &FontBase, hint: Option<(Code, Size, Known)>) {
+        let (mut code, mut size) = (None, None);
+        let mut closest = u32::MAX;
+
+        if let Some((h_code, h_size, h_known)) = hint {
+            (code, size) = (Some(h_code), Some(h_size));
+            closest = self.distance(&h_known) * 105 / 100;
+        }
+
+        for (key, family) in &fontbase.glyphs {
+            if code.is_some() && key != &code.unwrap() {
+                continue;
+            }
             for dw in -2..=2 {
                 for dh in -2..=2 {
                     let width = self.rect.width.saturating_add_signed(dw);
                     let height = self.rect.height.saturating_add_signed(dh);
                     if let Some(glyphs) = family.get(&(width, height)) {
                         for glyph in glyphs {
+                            if size != None && glyph.size != size.unwrap() {
+                                continue;
+                            }
                             let dist = self.distance(glyph);
-                            if dist < closest.1 {
-                                closest = (Some(glyph.clone()), dist);
+                            if dist <= closest {
+                                closest = dist;
+                                self.guess = Some(glyph.clone());
                             }
                         }
                     }
                 }
             }
         }
-
-        self.guess = closest.0;
     }
 
     pub fn save(&self, path: &str) -> Result<()> {

@@ -2,6 +2,17 @@ use crate::glyph;
 use crate::result::Result;
 use ab_glyph::{Font, FontVec};
 use std::collections::HashMap;
+use unicode_general_category::{get_general_category, GeneralCategory};
+
+const BLACKLIST: &[GeneralCategory] = &[
+    GeneralCategory::Control,
+    GeneralCategory::Format,
+    GeneralCategory::SpacingMark,
+    GeneralCategory::NonspacingMark,
+    GeneralCategory::LineSeparator,
+    GeneralCategory::ParagraphSeparator,
+    GeneralCategory::SpaceSeparator,
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Code {
@@ -23,6 +34,17 @@ impl Code {
             Code::Qpl,
             Code::Xits,
         ]
+    }
+
+    pub fn to_string(&self) -> &'static str {
+        match self {
+            Code::Cmr => "cmr",
+            Code::Lmr => "lmr",
+            Code::Qag => "qag",
+            Code::Qcr => "qcr",
+            Code::Qpl => "qpl",
+            Code::Xits => "xits",
+        }
     }
 
     pub fn as_path(&self) -> &'static str {
@@ -124,6 +146,9 @@ impl FontBase {
         let mut glyphs = HashMap::new();
         for size in Size::all() {
             for (id, chr) in font.codepoint_ids() {
+                if BLACKLIST.contains(&get_general_category(chr)) {
+                    continue;
+                }
                 if let Some(glyph) = glyph::Known::try_from(&font, id, chr, code, size, &styles) {
                     let key = (glyph.rect.width, glyph.rect.height);
                     glyphs.entry(key).or_insert(Vec::new()).push(glyph);

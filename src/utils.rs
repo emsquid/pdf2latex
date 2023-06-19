@@ -1,6 +1,6 @@
 use crate::result::{Error, Result};
 use image::{DynamicImage, GrayImage};
-use std::process::Command;
+use std::{collections::HashMap, hash::Hash, ops::AddAssign, process::Command};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Rect {
@@ -54,7 +54,7 @@ fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
 
 pub fn pdf_to_images(path: &str) -> Result<Vec<DynamicImage>> {
     let output = Command::new("pdftoppm")
-        .args(["-r", "300", path])
+        .args(["-r", "400", path])
         .output()?;
     match output.stderr.len() {
         0 => buffer_to_ppm(&output.stdout),
@@ -121,4 +121,14 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
     }
 
     pixels
+}
+
+pub fn average<T: Eq + Hash>(list: Vec<T>) -> T {
+    let mut count = HashMap::new();
+
+    for v in list {
+        count.entry(v).or_insert(0).add_assign(1);
+    }
+
+    count.into_iter().max_by_key(|(_, c)| c.clone()).unwrap().0
 }
