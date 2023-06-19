@@ -1,4 +1,4 @@
-use crate::glyph;
+use crate::glyph::KnownGlyph;
 use crate::result::Result;
 use ab_glyph::{Font, FontVec};
 use std::collections::HashMap;
@@ -90,7 +90,7 @@ impl Size {
     }
 
     pub fn as_pt(&self) -> f32 {
-        let base = 11.0;
+        let base = 12.0;
         let delta = match self {
             Size::Tiny => -5.0,
             Size::Scriptsize => -3.25,
@@ -135,11 +135,11 @@ impl Style {
 }
 
 pub struct FontBase {
-    pub glyphs: HashMap<Code, HashMap<(u32, u32), Vec<glyph::Known>>>,
+    pub glyphs: HashMap<Code, HashMap<(u32, u32), Vec<KnownGlyph>>>,
 }
 
 impl FontBase {
-    fn load_font(path: &str, code: Code) -> Result<HashMap<(u32, u32), Vec<glyph::Known>>> {
+    fn load_font(path: &str, code: Code) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
         let font = FontVec::try_from_vec(std::fs::read(path)?)?;
         let styles = Style::from(path);
 
@@ -149,7 +149,7 @@ impl FontBase {
                 if BLACKLIST.contains(&get_general_category(chr)) {
                     continue;
                 }
-                if let Some(glyph) = glyph::Known::try_from(&font, id, chr, code, size, &styles) {
+                if let Some(glyph) = KnownGlyph::try_from(&font, id, chr, code, size, &styles) {
                     let key = (glyph.rect.width, glyph.rect.height);
                     glyphs.entry(key).or_insert(Vec::new()).push(glyph);
                 }
@@ -159,7 +159,7 @@ impl FontBase {
         Ok(glyphs)
     }
 
-    fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<glyph::Known>>> {
+    fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
         let files = std::fs::read_dir(code.as_path())?;
 
         let mut family = HashMap::new();

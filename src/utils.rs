@@ -129,5 +129,5 @@ pub fn average<T: Eq + Hash>(list: Vec<T>) -> T {
         count.entry(key).or_insert(0).add_assign(1);
     }
 
-    count.into_iter().max_by_key(|(_, c)| *c).unwrap().0
+    count.into_iter().max_by_key(|&(_, c)| c).unwrap().0
 }

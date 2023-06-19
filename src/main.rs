@@ -12,7 +12,7 @@ fn process(path: &str) -> result::Result<()> {
 
     // file.pages[0].lines[1].words[0].glyphs[0].save("test/debug1.png")?;
     // file.pages[0].debug().save("test/debug.png")?;
-    // println!("{}", file.latex());
+    println!("{}", file.pages[0].get_content());
 
     Ok(())
 }

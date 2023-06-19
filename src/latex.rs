@@ -16,7 +16,7 @@ impl Latex {
     pub fn save(&self, path: &str) -> Result<()> {
         let mut file = File::create(path)?;
         let content = latex::print(&self.document).unwrap();
-        file.write(content.as_bytes())?;
+        file.write_all(content.as_bytes())?;
 
         Ok(())
     }

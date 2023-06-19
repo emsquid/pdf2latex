@@ -1,5 +1,5 @@
-use crate::font::{Code, FontBase, Size};
-use crate::glyph;
+use crate::font::{Code, FontBase, Size, Style};
+use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
 
@@ -7,19 +7,19 @@ const WORD_SPACING: u32 = 12;
 
 pub struct Word {
     pub rect: Rect,
-    pub glyphs: Vec<glyph::Unknown>,
+    pub glyphs: Vec<UnknownGlyph>,
 }
 
 impl Word {
-    fn find_glyphs(bounds: Rect, image: &DynamicImage) -> Vec<glyph::Unknown> {
+    fn find_glyphs(bounds: Rect, image: &DynamicImage) -> Vec<UnknownGlyph> {
         let gray = bounds.crop(image).to_luma8();
 
         let mut glyphs = Vec::new();
         let mut x = 0;
         'outer: while x < gray.width() {
             for y in 0..gray.height() {
-                if gray[(x, y)].0[0] <= glyph::CHAR_THRESHOLD {
-                    let glyph = glyph::Unknown::from((x, y), bounds, image);
+                if gray[(x, y)].0[0] <= CHAR_THRESHOLD {
+                    let glyph = UnknownGlyph::from((x, y), bounds, image);
                     x = glyph.rect.x - bounds.x + glyph.rect.width;
                     glyphs.push(glyph);
                     continue 'outer;
@@ -39,35 +39,60 @@ impl Word {
     }
 
     pub fn guess(&mut self, fontbase: &FontBase) {
+        let length = self.glyphs.len();
+
         for glyph in &mut self.glyphs {
-            glyph.guess(fontbase, None);
+            glyph.guess(fontbase, length, None);
         }
 
+        let hint = Option::zip(self.get_code(), self.get_size());
+        for glyph in &mut self.glyphs {
+            glyph.guess(fontbase, length, hint);
+        }
+    }
+
+    pub fn get_code(&self) -> Option<Code> {
         let codes = self
             .glyphs
             .iter()
-            .map(|glyph| glyph.guess.clone().unwrap().code)
-            .collect::<Vec<Code>>();
+            .map(|glyph| glyph.guess.clone().map(|guess| guess.code))
+            .collect();
+
+        average(codes)
+    }
+
+    pub fn get_size(&self) -> Option<Size> {
         let sizes = self
             .glyphs
             .iter()
-            .map(|glyph| glyph.guess.clone().unwrap().size)
-            .collect::<Vec<Size>>();
-        let (a_code, a_size) = (average(codes), average(sizes));
+            .map(|glyph| glyph.guess.clone().map(|guess| guess.size))
+            .collect();
 
-        for glyph in &mut self.glyphs {
-            glyph.guess(fontbase, Some((a_code, a_size)));
-        }
+        average(sizes)
     }
 
     pub fn get_content(&self) -> String {
         let mut content = String::new();
         for glyph in &self.glyphs {
             if let Some(guess) = &glyph.guess {
+                if !guess.chr.is_ascii() {
+                    content.push_str("\x1b[31m");
+                }
+                if guess.styles.contains(&Style::Bold) {
+                    content.push_str("\x1b[1m");
+                }
+                if guess.styles.contains(&Style::Italic) {
+                    content.push_str("\x1b[3m");
+                }
+                if guess.styles.contains(&Style::Slanted) {
+                    content.push_str("\x1b[3;4m");
+                }
                 content.push(guess.chr);
             } else {
-                content.push(' ');
+                content.push_str("\x1b[33m");
+                content.push('\u{2584}');
             }
+            content.push_str("\x1b[0m");
         }
 
         content
