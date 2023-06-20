@@ -1,6 +1,7 @@
 use crate::glyph::KnownGlyph;
 use crate::result::Result;
 use ab_glyph::{Font, FontVec};
+use ucd::{Script,UnicodeBlock,UnicodeCategory};
 use std::collections::HashMap;
 use unicode_general_category::{get_general_category, GeneralCategory};
 
@@ -12,6 +13,40 @@ const BLACKLIST: &[GeneralCategory] = &[
     GeneralCategory::LineSeparator,
     GeneralCategory::ParagraphSeparator,
     GeneralCategory::SpaceSeparator,
+];
+
+const WHITELIST_SCRIPT: &[Script] = &[
+
+];
+
+const WHITELIST_BLOCK: &[UnicodeBlock] = &[
+    UnicodeBlock::BasicLatin,
+    UnicodeBlock::Latin1Supplement,
+    UnicodeBlock::LatinExtendedA,
+    UnicodeBlock::LatinExtendedB, //80%
+    UnicodeBlock::IPAExtensions, //80%
+    UnicodeBlock::GreekandCoptic,
+    UnicodeBlock::Hebrew, //Lots of strange thingys
+    UnicodeBlock::LatinExtendedAdditional, //40%
+    UnicodeBlock::GeneralPunctuation, //90%
+    UnicodeBlock::SuperscriptsandSubscripts, //60%
+    UnicodeBlock::LetterlikeSymbols, //Ensemble maths
+    UnicodeBlock::Arrows,
+    UnicodeBlock::MathematicalOperators,
+    UnicodeBlock::MiscellaneousMathematicalSymbolsA,
+    UnicodeBlock::SupplementalArrowsA,
+    UnicodeBlock::SupplementalArrowsB,
+    UnicodeBlock::MiscellaneousMathematicalSymbolsB,
+    UnicodeBlock::SupplementalMathematicalOperators,
+    UnicodeBlock::LatinExtendedC,
+    UnicodeBlock::AlphabeticPresentationForms,
+    UnicodeBlock::Gothic,
+    UnicodeBlock::CuneiformNumbersandPunctuation,
+    UnicodeBlock::MathematicalAlphanumericSymbols
+];
+
+const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
+
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
