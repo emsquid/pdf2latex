@@ -6,7 +6,7 @@ use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 use std::ops::MulAssign;
 
 pub const CHAR_THRESHOLD: u8 = 175;
-const ASCII_BONUS: f32 = 0.4;
+const ASCII_BONUS: f32 = 0.25;
 
 #[derive(Clone)]
 pub struct KnownGlyph {
@@ -164,7 +164,12 @@ impl UnknownGlyph {
         dist
     }
 
-    pub fn guess(&mut self, fontbase: &FontBase, word_length: usize, hint: Option<(Code, Size)>) {
+    pub fn try_guess(
+        &mut self,
+        fontbase: &FontBase,
+        word_length: usize,
+        hint: Option<(Code, Size)>,
+    ) {
         // check if distance deserves a bonus
         let bonus = |dist: &mut f32, chr: char| {
             if chr.is_ascii() && word_length > 1 {
@@ -180,8 +185,8 @@ impl UnknownGlyph {
             bonus(&mut closest, known.chr);
         }
 
-        for (key, family) in &fontbase.glyphs {
-            if code.is_some() && key != &code.unwrap() {
+        for (&key, family) in &fontbase.glyphs {
+            if code.is_some() && key != code.unwrap() {
                 continue;
             }
 

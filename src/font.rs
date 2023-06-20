@@ -2,16 +2,36 @@ use crate::glyph::KnownGlyph;
 use crate::result::Result;
 use ab_glyph::{Font, FontVec};
 use std::collections::HashMap;
-use unicode_general_category::{get_general_category, GeneralCategory};
+use ucd::{Codepoint, Script, UnicodeBlock, UnicodeCategory};
 
-const BLACKLIST: &[GeneralCategory] = &[
-    GeneralCategory::Control,
-    GeneralCategory::Format,
-    GeneralCategory::SpacingMark,
-    GeneralCategory::NonspacingMark,
-    GeneralCategory::LineSeparator,
-    GeneralCategory::ParagraphSeparator,
-    GeneralCategory::SpaceSeparator,
+const WHITELIST_SCRIPT: &[Script] = &[
+    Script::Gothic,
+    Script::Greek,
+    Script::Hebrew,
+    Script::Latin,
+    Script::Common,
+];
+
+const WHITELIST_BLOCK: &[UnicodeBlock] = &[];
+
+const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
+    UnicodeCategory::LowercaseLetter,
+    UnicodeCategory::ModifierLetter,
+    UnicodeCategory::OtherLetter,
+    UnicodeCategory::UppercaseLetter,
+    UnicodeCategory::EnclosingMark,
+    UnicodeCategory::DecimalNumber,
+    UnicodeCategory::LetterNumber,
+    UnicodeCategory::ConnectorPunctuation,
+    UnicodeCategory::DashPunctuation,
+    UnicodeCategory::OpenPunctuation,
+    UnicodeCategory::ClosePunctuation,
+    UnicodeCategory::InitialPunctuation,
+    UnicodeCategory::FinalPunctuation,
+    UnicodeCategory::OtherPunctuation,
+    UnicodeCategory::CurrencySymbol,
+    UnicodeCategory::MathSymbol,
+    UnicodeCategory::OtherSymbol,
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -146,12 +166,19 @@ impl FontBase {
         let mut glyphs = HashMap::new();
         for size in Size::all() {
             for (id, chr) in font.codepoint_ids() {
-                if BLACKLIST.contains(&get_general_category(chr)) {
-                    continue;
-                }
-                if let Some(glyph) = KnownGlyph::try_from(&font, id, chr, code, size, &styles) {
-                    let key = (glyph.rect.width, glyph.rect.height);
-                    glyphs.entry(key).or_insert(Vec::new()).push(glyph);
+                if let (Some(script), Some(block), category) =
+                    (chr.script(), chr.block(), chr.category())
+                {
+                    if !WHITELIST_SCRIPT.contains(&script)
+                        // || !WHITELIST_BLOCK.contains(&block)
+                        || !WHITELIST_CATEGORY.contains(&category)
+                    {
+                        continue;
+                    }
+                    if let Some(glyph) = KnownGlyph::try_from(&font, id, chr, code, size, &styles) {
+                        let key = (glyph.rect.width, glyph.rect.height);
+                        glyphs.entry(key).or_insert(Vec::new()).push(glyph);
+                    }
                 }
             }
         }

@@ -1,10 +1,10 @@
+use crate::dictionary::Dictionary;
 use crate::font::FontBase;
 use crate::result::Result;
 use crate::text::Line;
 use crate::utils::{find_parts, pdf_to_images, Rect};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgba};
-use latex::{Document, DocumentClass, Element, PreambleElement};
 
 const LINE_SPACING: u32 = 5;
 
@@ -45,10 +45,10 @@ impl Page {
         });
     }
 
-    pub fn get_content(&self) -> String {
+    pub fn get_content(&self, dictionary: &Dictionary) -> String {
         let mut content = String::new();
         for line in &self.lines {
-            content.push_str(&line.get_content());
+            content.push_str(&line.get_content(dictionary));
             content.push('\n');
         }
 
@@ -101,5 +101,17 @@ impl Pdf {
         }
 
         Ok(())
+    }
+
+    pub fn get_content(&self) -> Result<String> {
+        let dictionary = Dictionary::new()?;
+
+        let mut content = String::new();
+        for page in &self.pages {
+            content.push_str(&page.get_content(&dictionary));
+            content.push('\n');
+        }
+
+        Ok(content)
     }
 }

@@ -1,3 +1,4 @@
+use crate::dictionary::Dictionary;
 use crate::font::{Code, FontBase, Size, Style};
 use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
@@ -42,12 +43,12 @@ impl Word {
         let length = self.glyphs.len();
 
         for glyph in &mut self.glyphs {
-            glyph.guess(fontbase, length, None);
+            glyph.try_guess(fontbase, length, None);
         }
 
         let hint = Option::zip(self.get_code(), self.get_size());
         for glyph in &mut self.glyphs {
-            glyph.guess(fontbase, length, hint);
+            glyph.try_guess(fontbase, length, hint);
         }
     }
 
@@ -71,7 +72,7 @@ impl Word {
         average(sizes)
     }
 
-    pub fn get_content(&self) -> String {
+    pub fn get_content(&self, _dictionary: &Dictionary) -> String {
         let mut content = String::new();
         for glyph in &self.glyphs {
             if let Some(guess) = &glyph.guess {
@@ -128,10 +129,10 @@ impl Line {
         }
     }
 
-    pub fn get_content(&self) -> String {
+    pub fn get_content(&self, dictionary: &Dictionary) -> String {
         let mut content = String::new();
         for word in &self.words {
-            content.push_str(&word.get_content());
+            content.push_str(&word.get_content(dictionary));
             content.push(' ');
         }
 
