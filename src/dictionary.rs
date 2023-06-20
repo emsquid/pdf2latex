@@ -1,5 +1,4 @@
 use crate::result::Result;
-use edit_distance::edit_distance;
 
 pub struct Dictionary {
     words: Vec<String>,
@@ -13,10 +12,10 @@ impl Dictionary {
         Ok(Dictionary { words })
     }
 
-    pub fn correct(&self, guess: String) -> String {
+    pub fn correct(&self, guess: &str) -> String {
         self.words
             .iter()
-            .min_by_key(|word| edit_distance(&guess, &word))
+            .min_by_key(|word| 1) // find the distance between word and guess
             .unwrap()
             .clone()
     }

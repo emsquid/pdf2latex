@@ -5,14 +5,39 @@ use std::collections::HashMap;
 use ucd::{Codepoint, Script, UnicodeBlock, UnicodeCategory};
 
 const WHITELIST_SCRIPT: &[Script] = &[
+    Script::Common,
+    Script::Cuneiform,
     Script::Gothic,
     Script::Greek,
     Script::Hebrew,
     Script::Latin,
-    Script::Common,
 ];
 
-const WHITELIST_BLOCK: &[UnicodeBlock] = &[];
+const WHITELIST_BLOCK: &[UnicodeBlock] = &[
+    UnicodeBlock::BasicLatin,
+    UnicodeBlock::Latin1Supplement,
+    UnicodeBlock::LatinExtendedA,
+    UnicodeBlock::LatinExtendedB,
+    UnicodeBlock::LatinExtendedC,
+    UnicodeBlock::IPAExtensions,
+    UnicodeBlock::GreekandCoptic,
+    UnicodeBlock::Hebrew,
+    UnicodeBlock::LatinExtendedAdditional,
+    UnicodeBlock::GeneralPunctuation,
+    UnicodeBlock::SuperscriptsandSubscripts,
+    UnicodeBlock::LetterlikeSymbols,
+    UnicodeBlock::Arrows,
+    UnicodeBlock::MathematicalOperators,
+    UnicodeBlock::MiscellaneousMathematicalSymbolsA,
+    UnicodeBlock::SupplementalArrowsA,
+    UnicodeBlock::SupplementalArrowsB,
+    UnicodeBlock::MiscellaneousMathematicalSymbolsB,
+    UnicodeBlock::SupplementalMathematicalOperators,
+    UnicodeBlock::AlphabeticPresentationForms,
+    UnicodeBlock::Gothic,
+    UnicodeBlock::CuneiformNumbersandPunctuation,
+    UnicodeBlock::MathematicalAlphanumericSymbols,
+];
 
 const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
     UnicodeCategory::LowercaseLetter,
@@ -170,7 +195,7 @@ impl FontBase {
                     (chr.script(), chr.block(), chr.category())
                 {
                     if !WHITELIST_SCRIPT.contains(&script)
-                        // || !WHITELIST_BLOCK.contains(&block)
+                        || !WHITELIST_BLOCK.contains(&block)
                         || !WHITELIST_CATEGORY.contains(&category)
                     {
                         continue;
