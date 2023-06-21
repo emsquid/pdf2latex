@@ -19,6 +19,13 @@ impl Rect {
             height,
         }
     }
+    
+    pub fn join(&mut self, rect: Rect) {
+        self.width = self.x.min(rect.x).abs_diff((rect.x + rect.width).max(self.x + self.width));
+        self.height = self.y.min(rect.y).abs_diff((rect.y + rect.height).max(self.y + self.height));
+        self.x = self.x.min(rect.x);
+        self.y = self.y.min(rect.y);
+    }
 
     pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
         image.crop_imm(self.x, self.y, self.width, self.height)

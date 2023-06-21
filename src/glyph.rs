@@ -79,6 +79,21 @@ pub struct UnknownGlyph {
 }
 
 impl UnknownGlyph {
+    pub fn distance_between(&self, glyph: UnknownGlyph) -> f32 {
+        let mut dist = f32::MAX;
+        for x1 in 0..self.rect.width {
+        for y1 in 0..self.rect.height {
+            if u8::from(self.image[(x1 + y1 * self.rect.width) as usize]) > 254 { continue; }
+
+            for x2 in 0..glyph.rect.width {
+            for y2 in 0..glyph.rect.height {
+                if u8::from(glyph.image[(x2 + y2 * glyph.rect.width) as usize]) > 254 { continue; }
+                
+                dist = dist.min((((x1 + self.rect.x - x2 - glyph.rect.x).pow(2) + ((y1 + self.rect.y - y2 - glyph.rect.y) / 4).pow(2)) as f32).sqrt())
+        }}}}
+        return dist;
+    }
+
     fn find_rect(start: (u32, u32), bounds: Rect, image: &DynamicImage) -> Rect {
         let base_pixels = flood_fill(vec![start], &bounds.crop(image).to_luma8(), CHAR_THRESHOLD);
 

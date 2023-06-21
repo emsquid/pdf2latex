@@ -76,6 +76,14 @@ impl Page {
                         i64::from(line.rect.y + line.rect.height + 1),
                     );
                 }
+                let sub = image::RgbaImage::from_pixel(word.rect.width, 2, Rgba([255, 100, 100, 255]));
+
+                overlay(
+                    &mut copy,
+                    &sub,
+                    i64::from(word.rect.x),
+                    i64::from(line.rect.y + line.rect.height + 4),
+                );
             }
         }
 
