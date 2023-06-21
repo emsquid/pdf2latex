@@ -4,7 +4,7 @@ use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
 
-const WORD_SPACING: u32 = 12;
+const WORD_SPACING: u32 = 15;
 
 pub struct Word {
     pub rect: Rect,

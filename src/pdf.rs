@@ -96,6 +96,7 @@ impl Pdf {
 
     pub fn guess(&mut self) -> Result<()> {
         let fontbase = FontBase::new()?;
+
         for page in &mut self.pages {
             page.guess(&fontbase);
         }

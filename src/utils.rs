@@ -54,7 +54,7 @@ fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
 
 pub fn pdf_to_images(path: &str) -> Result<Vec<DynamicImage>> {
     let output = Command::new("pdftoppm")
-        .args(["-r", "400", path])
+        .args(["-r", "512", path])
         .output()?;
     match output.stderr.len() {
         0 => buffer_to_ppm(&output.stdout),

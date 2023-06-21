@@ -5,8 +5,8 @@ use ab_glyph::{Font, FontVec, GlyphId};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 use std::ops::MulAssign;
 
-pub const CHAR_THRESHOLD: u8 = 175;
-const ASCII_BONUS: f32 = 0.25;
+pub const CHAR_THRESHOLD: u8 = 75;
+const ASCII_BONUS: f32 = 0.3;
 
 #[derive(Clone)]
 pub struct KnownGlyph {
@@ -29,7 +29,7 @@ impl KnownGlyph {
         styles: &[Style],
     ) -> Option<KnownGlyph> {
         // TODO: improve scale
-        let scale = font.pt_to_px_scale(size.as_pt() * 400. / 96.).unwrap();
+        let scale = font.pt_to_px_scale(size.as_pt() * 512. / 96.).unwrap();
         let glyph = id.with_scale(scale);
 
         if let Some(outlined) = font.outline_glyph(glyph) {
@@ -181,7 +181,7 @@ impl UnknownGlyph {
         let mut closest = f32::MAX;
         if let (Some((h_code, h_size)), Some(known)) = (hint, &self.guess) {
             (code, size) = (Some(h_code), Some(h_size));
-            closest = self.distance(known) * 1.05;
+            closest = self.distance(known) * 1.1;
             bonus(&mut closest, known.chr);
         }
 

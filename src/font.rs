@@ -16,13 +16,8 @@ const WHITELIST_SCRIPT: &[Script] = &[
 const WHITELIST_BLOCK: &[UnicodeBlock] = &[
     UnicodeBlock::BasicLatin,
     UnicodeBlock::Latin1Supplement,
-    UnicodeBlock::LatinExtendedA,
-    UnicodeBlock::LatinExtendedB,
-    UnicodeBlock::LatinExtendedC,
-    UnicodeBlock::IPAExtensions,
     UnicodeBlock::GreekandCoptic,
     UnicodeBlock::Hebrew,
-    UnicodeBlock::LatinExtendedAdditional,
     UnicodeBlock::GeneralPunctuation,
     UnicodeBlock::SuperscriptsandSubscripts,
     UnicodeBlock::LetterlikeSymbols,
@@ -37,6 +32,7 @@ const WHITELIST_BLOCK: &[UnicodeBlock] = &[
     UnicodeBlock::Gothic,
     UnicodeBlock::CuneiformNumbersandPunctuation,
     UnicodeBlock::MathematicalAlphanumericSymbols,
+    UnicodeBlock::GeometricShapes,
 ];
 
 const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
@@ -59,12 +55,16 @@ const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
     UnicodeCategory::OtherSymbol,
 ];
 
+const BLACKLIST: &[char] = &['·'];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Code {
     Cmr,
     Lmr,
+    Put,
     Qag,
     Qcr,
+    Qcs,
     Qpl,
     Xits,
 }
@@ -74,33 +74,31 @@ impl Code {
         vec![
             Code::Cmr,
             Code::Lmr,
+            Code::Put,
             Code::Qag,
             Code::Qcr,
+            Code::Qcs,
             Code::Qpl,
             Code::Xits,
         ]
     }
 
-    pub fn to_string(&self) -> &'static str {
+    pub fn to_string(&self) -> String {
         match self {
             Code::Cmr => "cmr",
             Code::Lmr => "lmr",
+            Code::Put => "put",
             Code::Qag => "qag",
             Code::Qcr => "qcr",
+            Code::Qcs => "qcs",
             Code::Qpl => "qpl",
             Code::Xits => "xits",
         }
+        .to_string()
     }
 
-    pub fn as_path(&self) -> &'static str {
-        match self {
-            Code::Cmr => "fonts/cmr",
-            Code::Lmr => "fonts/lmr",
-            Code::Qag => "fonts/qag",
-            Code::Qcr => "fonts/qcr",
-            Code::Qpl => "fonts/qpl",
-            Code::Xits => "fonts/xits",
-        }
+    pub fn as_path(&self) -> String {
+        format!("fonts/{}", self.to_string())
     }
 }
 
@@ -197,6 +195,7 @@ impl FontBase {
                     if !WHITELIST_SCRIPT.contains(&script)
                         || !WHITELIST_BLOCK.contains(&block)
                         || !WHITELIST_CATEGORY.contains(&category)
+                        || BLACKLIST.contains(&chr)
                     {
                         continue;
                     }
