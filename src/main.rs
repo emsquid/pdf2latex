@@ -19,7 +19,7 @@ fn process(path: &str) -> result::Result<()> {
 }
 
 fn main() {
-    if let Err(err) = process("test/test_3_toLatex.pdf") {
+    if let Err(err) = process("test/test_3-2_toLatex.pdf") {
         eprintln!("{err}");
     }
 }

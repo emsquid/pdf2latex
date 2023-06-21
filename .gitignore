@@ -1,6 +1,7 @@
 __pycache__
 python/temp/*
 test.py
+test/debug.png
 
 target
 Cargo.lock
