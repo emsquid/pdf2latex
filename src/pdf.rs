@@ -40,7 +40,7 @@ impl Page {
 
             let mut stdout = std::io::stdout();
             let mut now = time::Instant::now();
-            
+
             stdout.write_all(
                 format!("\n\x1b[screating threads \t[{}] 0%               ",
                 (0..21).map(|_| " ").collect::<String>()
@@ -54,7 +54,7 @@ impl Page {
                 
                 // ======================== progress bar ==========================
                 progress += progress_step * 21.;
-                if ((progress - progress_step) * 100. / 21.).floor() != (progress * 100. / 21.).floor() {
+                if (progress - progress_step).floor() != progress.floor() {
                     let length = progress.floor() as u32;
                     
                     stdout.write_all((
@@ -86,7 +86,7 @@ impl Page {
             for handle in handles {
                 // ======================== progress bar ==========================
                 progress += progress_step * 21.;
-                if ((progress - progress_step) * 100. / 21.).floor() != (progress * 100. / 21.).floor() {
+                if (progress - progress_step).floor() != progress.floor() {
                     let length = progress.floor() as u32;
                     
                     stdout.write_all((

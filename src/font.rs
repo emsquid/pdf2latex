@@ -231,7 +231,7 @@ impl FontBase {
         for file in files {
             // ======================== progress bar ==========================
             progress += progress_step * 21.;
-            if ((progress - progress_step) * 100. / 21.).floor() != (progress * 100. / 21.).floor() {
+            if (progress - progress_step).floor() != progress.floor() {
                 let length = progress.floor() as u32;
                 
                 stdout.write_all((
