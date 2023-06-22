@@ -107,42 +107,42 @@ pub struct Line {
 
 impl Line {
     fn find_words(bounds: Rect, image: &DynamicImage) -> Vec<Word> {
-        // find_parts(&bounds.crop(image).rotate90().to_luma8(), WORD_SPACING)
-        //     .into_iter()
-        //     .map(|(start, end)| {
-        //         let rect = Rect::new(bounds.x + start, bounds.y, end - start + 1, bounds.height);
-        //         Word::from(rect, image)
-        //     })
-        //     .collect()
+        find_parts(&bounds.crop(image).rotate90().to_luma8(), WORD_SPACING)
+            .into_iter()
+            .map(|(start, end)| {
+                let rect = Rect::new(bounds.x + start, bounds.y, end - start + 1, bounds.height);
+                Word::from(rect, image)
+            })
+            .collect()
         
-        let letters = Word::find_glyphs(bounds, image);
-        let mut words = Vec::new();
-        if letters.len() == 0 {
-            return words;
-        }
+        // let letters = Word::find_glyphs(bounds, image);
+        // let mut words = Vec::new();
+        // if letters.len() == 0 {
+        //     return words;
+        // }
 
-        words.push(Word{
-            rect: letters[0].rect,
-            glyphs: Vec::new(),
-        });
-        words[0].glyphs.push(letters[0].clone());
-        for glyph in &letters[1..]
-        {
-            if glyph.distance_between(words.last().unwrap().glyphs.last().unwrap().clone()) < WORD_SPACING as f32
-            {
-                words.last_mut().unwrap().rect.join(glyph.rect);
-                words.last_mut().unwrap().glyphs.push(glyph.clone());
-            }
-            else
-            {
-                words.push(Word{
-                    rect: glyph.rect,
-                    glyphs: Vec::new(),
-                });
-                words.last_mut().unwrap().glyphs.push(glyph.clone());
-            }
-        };
-        return words;
+        // words.push(Word{
+        //     rect: letters[0].rect,
+        //     glyphs: Vec::new(),
+        // });
+        // words[0].glyphs.push(letters[0].clone());
+        // for glyph in &letters[1..]
+        // {
+        //     if glyph.distance_between(words.last().unwrap().glyphs.last().unwrap().clone()) < WORD_SPACING as f32
+        //     {
+        //         words.last_mut().unwrap().rect.join(glyph.rect);
+        //         words.last_mut().unwrap().glyphs.push(glyph.clone());
+        //     }
+        //     else
+        //     {
+        //         words.push(Word{
+        //             rect: glyph.rect,
+        //             glyphs: Vec::new(),
+        //         });
+        //         words.last_mut().unwrap().glyphs.push(glyph.clone());
+        //     }
+        // };
+        // return words;
     }
 
     pub fn from(rect: Rect, image: &DynamicImage) -> Line {
