@@ -50,7 +50,6 @@ impl Dictionary {
     fn correct_word(&self,guess: &str) -> String{
         let mut best_word: String = String::new();
         if guess.chars().all(|chr| chr.is_ascii()){
-            println!("Entrée mot : {guess}");
             let mut dist_max: f64 = 0.0;
             let mut uppercases: Vec<bool> = vec![false; guess.len()];
 
@@ -67,9 +66,6 @@ impl Dictionary {
                     }
                 }
             }
-            
-            println!("Le plus ressemblant est : {}",best_word);
-            if dist_max == 1.0 {println!("Perfect match !");}
 
             for i in 0..uppercases.len(){
                 if uppercases[i]{
