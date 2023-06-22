@@ -3,6 +3,8 @@ use crate::result::Result;
 use ab_glyph::{Font, FontVec};
 use std::collections::HashMap;
 use ucd::{Codepoint, Script, UnicodeBlock, UnicodeCategory};
+use std::io::Write;
+use std::time;
 
 const WHITELIST_SCRIPT: &[Script] = &[
     Script::Common,
@@ -211,24 +213,67 @@ impl FontBase {
     }
 
     fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
+        let files_count = std::fs::read_dir(code.as_path())?.count();
         let files = std::fs::read_dir(code.as_path())?;
+        
+        let now = time::Instant::now();
+        let mut stdout = std::io::stdout();
+        let mut progress = 0.;
+        let progress_step = 1. / (files_count) as f32;
+        stdout.write_all(
+            format!("\n\x1b[sloading font {}\t[{}] 0%               ",
+            code.to_string(),
+            (0..21).map(|_| " ").collect::<String>()
+        ).as_bytes()).unwrap();
+        stdout.flush().unwrap();
 
         let mut family = HashMap::new();
         for file in files {
+            // ======================== progress bar ==========================
+            progress += progress_step * 21.;
+            if ((progress - progress_step) * 100. / 21.).floor() != (progress * 100. / 21.).floor() {
+                let length = progress.floor() as u32;
+                
+                stdout.write_all((
+                    format!("\x1b[uloading font {}\t[{}{}] {}%               ",
+                    code.to_string(),
+                    (0..length).map(|_| "=").collect::<String>(),
+                    (length..20).map(|_| " ").collect::<String>(),
+                    (progress * 100. / 21.).round())
+                ).as_bytes()).unwrap();
+                stdout.flush().unwrap();
+            }
+            // =================================================================
+
             let path = file?.path();
             for (key, glyphs) in FontBase::load_font(&path.to_string_lossy(), code)? {
                 family.entry(key).or_insert(Vec::new()).extend(glyphs);
             }
         }
+        stdout.write_all(
+            format!("\x1b[uloading font {}\t[{}] {}s               ",
+            code.to_string(),
+            (0..21).map(|_| "=").collect::<String>(),
+            now.elapsed().as_secs_f32()
+        ).as_bytes()).unwrap();
+        stdout.flush().unwrap();
 
         Ok(family)
     }
 
     pub fn new() -> Result<FontBase> {
+        let now = time::Instant::now();
+        let mut stdout = std::io::stdout();
+        stdout.write_all(b"LOADING FONTS").unwrap();
+        stdout.flush().unwrap();
+
         let mut glyphs = HashMap::new();
         for code in Code::all() {
             glyphs.insert(code, FontBase::load_family(code)?);
         }
+        
+        stdout.write_all(format!("\n{} FONTS LOADED IN {}s\n", Code::all().len(), now.elapsed().as_secs_f32()).as_bytes()).unwrap();
+        stdout.flush().unwrap();
 
         Ok(FontBase { glyphs })
     }
