@@ -66,7 +66,7 @@ pub enum Code {
     Qcr,
     Qcs,
     Qpl,
-    Xits,
+    // Xits,
 }
 
 impl Code {
@@ -79,7 +79,7 @@ impl Code {
             Code::Qcr,
             Code::Qcs,
             Code::Qpl,
-            Code::Xits,
+            // Code::Xits,
         ]
     }
 
@@ -92,7 +92,7 @@ impl Code {
             Code::Qcr => "qcr",
             Code::Qcs => "qcs",
             Code::Qpl => "qpl",
-            Code::Xits => "xits",
+            // Code::Xits => "xits",
         }
         .to_string()
     }
@@ -133,21 +133,21 @@ impl Size {
     }
 
     pub fn as_pt(&self) -> f32 {
-        let base = 12.0;
+        // considering size is 11pt
         let delta = match self {
-            Size::Tiny => -5.0,
-            Size::Scriptsize => -3.25,
-            Size::Footnotesize => -2.0,
-            Size::Small => -1.0,
-            Size::Normalsize => 0.0,
-            Size::Large => 2.0,
-            Size::LLarge => 4.4,
-            Size::LLLarge => 7.28,
-            Size::Huge => 10.74,
-            Size::HHuge => 14.88,
+            Size::Tiny => 6.,
+            Size::Scriptsize => 8.,
+            Size::Footnotesize => 9.,
+            Size::Small => 10.,
+            Size::Normalsize => 10.95,
+            Size::Large => 12.,
+            Size::LLarge => 14.4,
+            Size::LLLarge => 17.28,
+            Size::Huge => 20.74,
+            Size::HHuge => 24.88,
         };
 
-        base + delta
+        delta
     }
 }
 
