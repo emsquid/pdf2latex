@@ -5,6 +5,8 @@ use crate::text::Line;
 use crate::utils::{find_parts, pdf_to_images, Rect};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgba};
+use std::io::Write;
+use std::time;
 
 const LINE_SPACING: u32 = 5;
 
@@ -33,15 +35,79 @@ impl Page {
 
     pub fn guess(&mut self, fontbase: &FontBase) {
         std::thread::scope(|scope| {
+            let mut progress = 0.;
+            let progress_step = 1. / self.lines.len() as f32;
+
+            let mut stdout = std::io::stdout();
+            let mut now = time::Instant::now();
+
+            stdout.write_all(
+                format!("\n\x1b[screating threads \t[{}] 0%               ",
+                (0..21).map(|_| " ").collect::<String>()
+            ).as_bytes()).unwrap();
+            stdout.flush().unwrap();
+
             let mut handles = Vec::new();
             for line in &mut self.lines {
                 let handle = scope.spawn(move || line.guess(fontbase));
                 handles.push(handle);
+                
+                // ======================== progress bar ==========================
+                progress += progress_step * 21.;
+                if (progress - progress_step).floor() != progress.floor() {
+                    let length = progress.floor() as u32;
+                    
+                    stdout.write_all((
+                        format!("\x1b[ucreating threads \t[{}{}] {}%               ",
+                        (0..length).map(|_| "=").collect::<String>(),
+                        (length..20).map(|_| " ").collect::<String>(),
+                        (progress * 100. / 21.).round())
+                    ).as_bytes()).unwrap();
+                    stdout.flush().unwrap();
+                }
+                // =================================================================
             }
+            stdout.write_all(
+                format!("\x1b[ucreating threads \t[{}] {}s               ",
+                (0..21).map(|_| "=").collect::<String>(),
+                now.elapsed().as_secs_f32()
+            ).as_bytes()).unwrap();
+            stdout.flush().unwrap();
 
+            progress = 0.;
+            
+            stdout.write_all(
+                format!("\n\x1b[sconverting text \t[{}] 0%               ",
+                (0..21).map(|_| " ").collect::<String>()
+            ).as_bytes()).unwrap();
+            stdout.flush().unwrap();
+            now = time::Instant::now();
+            
             for handle in handles {
+                // ======================== progress bar ==========================
+                progress += progress_step * 21.;
+                if (progress - progress_step).floor() != progress.floor() {
+                    let length = progress.floor() as u32;
+                    
+                    stdout.write_all((
+                        format!("\x1b[uconverting text \t[{}{}] {}%               ",
+                        (0..length).map(|_| "=").collect::<String>(),
+                        (length..20).map(|_| " ").collect::<String>(),
+                        (progress * 100. / 21.).round())
+                    ).as_bytes()).unwrap();
+                    stdout.flush().unwrap();
+                }
+                // =================================================================
+
                 handle.join().unwrap();
             }
+            
+            stdout.write_all(
+                format!("\x1b[uconverting text \t[{}] {}s               \n",
+                (0..21).map(|_| "=").collect::<String>(),
+                now.elapsed().as_secs_f32()
+            ).as_bytes()).unwrap();
+            stdout.flush().unwrap();
         });
     }
 

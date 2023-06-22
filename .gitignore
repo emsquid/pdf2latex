@@ -2,6 +2,7 @@ __pycache__
 python/temp/*
 test.py
 test/debug.png
+test/guess*
 
 target
 Cargo.lock
