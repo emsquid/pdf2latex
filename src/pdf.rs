@@ -1,11 +1,13 @@
+use crate::args::Args;
 use crate::dictionary::Dictionary;
 use crate::font::FontBase;
 use crate::result::Result;
 use crate::text::Line;
-use crate::utils::{find_parts, pdf_to_images, Rect};
+use crate::utils::{find_parts, log, pdf_to_images, Rect};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgba};
 use std::io::Write;
+use std::path::Path;
 use std::time;
 
 const LINE_SPACING: u32 = 5;
@@ -33,82 +35,46 @@ impl Page {
         }
     }
 
-    pub fn guess(&mut self, fontbase: &FontBase) {
-        std::thread::scope(|scope| {
-            let mut progress = 0.;
-            let progress_step = 1. / self.lines.len() as f32;
-
-            let mut stdout = std::io::stdout();
+    pub fn guess(&mut self, fontbase: &FontBase) -> Result<()> {
+        std::thread::scope(|scope| -> Result<()> {
             let mut now = time::Instant::now();
+            let mut progress = 0.;
+            let step = 1. / self.lines.len() as f32;
 
-            stdout.write_all(
-                format!("\n\x1b[screating threads \t[{}] 0%               ",
-                (0..21).map(|_| " ").collect::<String>()
-            ).as_bytes()).unwrap();
-            stdout.flush().unwrap();
+            std::io::stdout().write_all(b"\n\x1b[s")?;
+            log("creating threads", Some(0.), None)?;
 
             let mut handles = Vec::new();
             for line in &mut self.lines {
                 let handle = scope.spawn(move || line.guess(fontbase));
                 handles.push(handle);
-                
-                // ======================== progress bar ==========================
-                progress += progress_step * 21.;
-                if (progress - progress_step).floor() != progress.floor() {
-                    let length = progress.floor() as u32;
-                    
-                    stdout.write_all((
-                        format!("\x1b[ucreating threads \t[{}{}] {}%               ",
-                        (0..length).map(|_| "=").collect::<String>(),
-                        (length..20).map(|_| " ").collect::<String>(),
-                        (progress * 100. / 21.).round())
-                    ).as_bytes()).unwrap();
-                    stdout.flush().unwrap();
-                }
-                // =================================================================
-            }
-            stdout.write_all(
-                format!("\x1b[ucreating threads \t[{}] {}s               ",
-                (0..21).map(|_| "=").collect::<String>(),
-                now.elapsed().as_secs_f32()
-            ).as_bytes()).unwrap();
-            stdout.flush().unwrap();
 
-            progress = 0.;
-            
-            stdout.write_all(
-                format!("\n\x1b[sconverting text \t[{}] 0%               ",
-                (0..21).map(|_| " ").collect::<String>()
-            ).as_bytes()).unwrap();
-            stdout.flush().unwrap();
+                progress += step;
+                log("creating threads", Some(progress), None)?;
+            }
+
+            let duration = now.elapsed().as_secs_f32();
+            log("creating threads", Some(1.), Some(duration))?;
+
             now = time::Instant::now();
-            
-            for handle in handles {
-                // ======================== progress bar ==========================
-                progress += progress_step * 21.;
-                if (progress - progress_step).floor() != progress.floor() {
-                    let length = progress.floor() as u32;
-                    
-                    stdout.write_all((
-                        format!("\x1b[uconverting text \t[{}{}] {}%               ",
-                        (0..length).map(|_| "=").collect::<String>(),
-                        (length..20).map(|_| " ").collect::<String>(),
-                        (progress * 100. / 21.).round())
-                    ).as_bytes()).unwrap();
-                    stdout.flush().unwrap();
-                }
-                // =================================================================
+            progress = 0.;
 
+            std::io::stdout().write_all(b"\n\x1b[s")?;
+            log("converting text", Some(0.), None)?;
+
+            for handle in handles {
                 handle.join().unwrap();
+
+                progress += step;
+                log("converting text", Some(progress), None)?;
             }
-            
-            stdout.write_all(
-                format!("\x1b[uconverting text \t[{}] {}s               \n",
-                (0..21).map(|_| "=").collect::<String>(),
-                now.elapsed().as_secs_f32()
-            ).as_bytes()).unwrap();
-            stdout.flush().unwrap();
-        });
+
+            let duration = now.elapsed().as_secs_f32();
+            log("converting text", Some(1.), Some(duration))?;
+            std::io::stdout().write_all(b"\n")?;
+
+            Ok(())
+        })
     }
 
     pub fn get_content(&self, dictionary: &Dictionary) -> String {
@@ -142,7 +108,8 @@ impl Page {
                         i64::from(line.rect.y + line.rect.height + 1),
                     );
                 }
-                let sub = image::RgbaImage::from_pixel(word.rect.width, 2, Rgba([255, 100, 100, 255]));
+                let sub =
+                    image::RgbaImage::from_pixel(word.rect.width, 2, Rgba([255, 100, 100, 255]));
 
                 overlay(
                     &mut copy,
@@ -162,17 +129,17 @@ pub struct Pdf {
 }
 
 impl Pdf {
-    pub fn load(path: &str) -> Result<Pdf> {
+    pub fn load(path: &Path) -> Result<Pdf> {
         let pages = pdf_to_images(path)?.iter().map(Page::from).collect();
 
         Ok(Pdf { pages })
     }
 
-    pub fn guess(&mut self) -> Result<()> {
-        let fontbase = FontBase::new()?;
+    pub fn guess(&mut self, args: &Args) -> Result<()> {
+        let fontbase = FontBase::new(args)?;
 
         for page in &mut self.pages {
-            page.guess(&fontbase);
+            page.guess(&fontbase)?;
         }
 
         Ok(())
@@ -188,5 +155,11 @@ impl Pdf {
         }
 
         Ok(content)
+    }
+
+    pub fn save_content(&self, path: &Path) -> Result<()> {
+        std::fs::write(path, self.get_content()?)?;
+
+        Ok(())
     }
 }

@@ -1,3 +1,4 @@
+use crate::args::Args;
 use crate::font::{Code, FontBase, Size, Style};
 use crate::result::Result;
 use crate::utils::{flood_fill, Rect};
@@ -32,7 +33,7 @@ pub trait Glyph {
         let height = u32::max(self.rect().height, other.rect().height);
         for x in 0..width {
             for y in 0..height {
-                for (&(dx, dy), value) in dist.iter_mut() {
+                for (&(dx, dy), value) in &mut dist {
                     if *value < limit {
                         let v_g = self.get_pixel(x, y);
                         let v_o = other
@@ -43,13 +44,13 @@ pub trait Glyph {
             }
         }
 
-        dist.values().min_by(|a, b| a.total_cmp(b)).unwrap().clone()
+        *dist.values().min_by(|a, b| a.total_cmp(b)).unwrap()
     }
 
     fn save(&self, path: &str) -> Result<()> {
         image::save_buffer_with_format(
             path,
-            &self.image(),
+            self.image(),
             self.rect().width,
             self.rect().height,
             image::ColorType::L8,
@@ -89,9 +90,12 @@ impl KnownGlyph {
         code: Code,
         size: Size,
         styles: &[Style],
+        args: &Args,
     ) -> Option<KnownGlyph> {
         // TODO: improve scale
-        let scale = font.pt_to_px_scale(size.as_pt() * 512. / 96.).unwrap();
+        let scale = font
+            .pt_to_px_scale(size.as_pt(args.size as f32) * 512. / 96.)
+            .unwrap();
         let glyph = id.with_scale(scale);
 
         if let Some(outlined) = font.outline_glyph(glyph) {
@@ -138,33 +142,6 @@ impl Glyph for UnknownGlyph {
 }
 
 impl UnknownGlyph {
-    pub fn distance_between(&self, glyph: UnknownGlyph) -> f32 {
-        let mut dist = f32::MAX;
-        for x1 in 0..self.rect.width {
-            for y1 in 0..self.rect.height {
-                if u8::from(self.image[(x1 + y1 * self.rect.width) as usize]) > 254 {
-                    continue;
-                }
-
-                for x2 in 0..glyph.rect.width {
-                    for y2 in 0..glyph.rect.height {
-                        if u8::from(glyph.image[(x2 + y2 * glyph.rect.width) as usize]) > 254 {
-                            continue;
-                        }
-
-                        dist = dist.min(
-                            (((x1 + self.rect.x - x2 - glyph.rect.x).pow(2)
-                                + ((y1 + self.rect.y - y2 - glyph.rect.y) / 4).pow(2))
-                                as f32)
-                                .sqrt(),
-                        )
-                    }
-                }
-            }
-        }
-        return dist;
-    }
-
     fn find_rect(start: (u32, u32), bounds: Rect, image: &DynamicImage) -> Rect {
         let base_pixels = flood_fill(vec![start], &bounds.crop(image).to_luma8(), CHAR_THRESHOLD);
 
@@ -249,8 +226,8 @@ impl UnknownGlyph {
                 continue;
             }
 
-            for dw in -2..=2 {
-                for dh in -2..=2 {
+            for dw in -1..=1 {
+                for dh in -1..=1 {
                     let width = self.rect.width.saturating_add_signed(dw);
                     let height = self.rect.height.saturating_add_signed(dh);
                     if let Some(glyphs) = family.get(&(width, height)) {

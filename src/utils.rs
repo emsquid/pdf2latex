@@ -1,6 +1,8 @@
 use crate::result::{Error, Result};
 use image::{DynamicImage, GrayImage};
-use std::{collections::HashMap, hash::Hash, ops::AddAssign, process::Command};
+use std::{
+    collections::HashMap, hash::Hash, io::Write, ops::AddAssign, path::Path, process::Command,
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Rect {
@@ -18,13 +20,6 @@ impl Rect {
             width,
             height,
         }
-    }
-    
-    pub fn join(&mut self, rect: Rect) {
-        self.width = self.x.min(rect.x).abs_diff((rect.x + rect.width).max(self.x + self.width));
-        self.height = self.y.min(rect.y).abs_diff((rect.y + rect.height).max(self.y + self.height));
-        self.x = self.x.min(rect.x);
-        self.y = self.y.min(rect.y);
     }
 
     pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
@@ -59,9 +54,9 @@ fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
     Ok(images)
 }
 
-pub fn pdf_to_images(path: &str) -> Result<Vec<DynamicImage>> {
+pub fn pdf_to_images(path: &Path) -> Result<Vec<DynamicImage>> {
     let output = Command::new("pdftoppm")
-        .args(["-r", "512", path])
+        .args(["-r", "512", &path.to_string_lossy()])
         .output()?;
     match output.stderr.len() {
         0 => buffer_to_ppm(&output.stdout),
@@ -137,4 +132,31 @@ pub fn average<T: Eq + Hash>(list: Vec<T>) -> T {
     }
 
     count.into_iter().max_by_key(|&(_, c)| c).unwrap().0
+}
+
+pub fn log(message: &str, progress: Option<f32>, duration: Option<f32>) -> Result<()> {
+    let mut stdout = std::io::stdout();
+    stdout.write_all(b"\x1b[u")?;
+    match (progress, duration) {
+        (Some(progress), Some(duration)) => {
+            let progress = (progress * 20.) as u32;
+            let bar = (0..20)
+                .map(|i| if i < progress { '=' } else { ' ' })
+                .collect::<String>();
+            stdout.write_all(format!("{message} \t[{bar}] in {duration}s").as_bytes())
+        }
+        (Some(progress), None) => {
+            let progress = (progress * 20.) as u32;
+            let percent = progress * 100 / 20;
+            let bar = (0..20)
+                .map(|i| if i < progress { '=' } else { ' ' })
+                .collect::<String>();
+            stdout.write_all(format!("{message} \t[{bar}] {percent}%").as_bytes())
+        }
+        (None, Some(duration)) => stdout.write_all(format!("{message} in {duration}s").as_bytes()),
+        (None, None) => stdout.write_all(format!("{message}").as_bytes()),
+    }?;
+    stdout.flush()?;
+
+    Ok(())
 }

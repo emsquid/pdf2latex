@@ -1,6 +1,6 @@
 use crate::dictionary::Dictionary;
 use crate::font::{Code, FontBase, Size, Style};
-use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD, self};
+use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
 
@@ -83,7 +83,7 @@ impl Word {
                     content.push_str("\x1b[1m");
                 }
                 if guess.styles.contains(&Style::Italic) {
-                    content.push_str("\x1b[3m");
+                    content.push_str("\x1b[34m");
                 }
                 if guess.styles.contains(&Style::Slanted) {
                     content.push_str("\x1b[3;4m");
@@ -114,35 +114,6 @@ impl Line {
                 Word::from(rect, image)
             })
             .collect()
-        
-        // let letters = Word::find_glyphs(bounds, image);
-        // let mut words = Vec::new();
-        // if letters.len() == 0 {
-        //     return words;
-        // }
-
-        // words.push(Word{
-        //     rect: letters[0].rect,
-        //     glyphs: Vec::new(),
-        // });
-        // words[0].glyphs.push(letters[0].clone());
-        // for glyph in &letters[1..]
-        // {
-        //     if glyph.distance_between(words.last().unwrap().glyphs.last().unwrap().clone()) < WORD_SPACING as f32
-        //     {
-        //         words.last_mut().unwrap().rect.join(glyph.rect);
-        //         words.last_mut().unwrap().glyphs.push(glyph.clone());
-        //     }
-        //     else
-        //     {
-        //         words.push(Word{
-        //             rect: glyph.rect,
-        //             glyphs: Vec::new(),
-        //         });
-        //         words.last_mut().unwrap().glyphs.push(glyph.clone());
-        //     }
-        // };
-        // return words;
     }
 
     pub fn from(rect: Rect, image: &DynamicImage) -> Line {
