@@ -105,7 +105,6 @@ impl Dictionary {
                 is_punct_turn = !is_punct_turn;
             }
         }
-        println!("Le guess renvoye est : {corrected}");
         corrected
     }
 }
