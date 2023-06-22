@@ -80,13 +80,13 @@ impl Word {
                     content.push_str("\x1b[31m");
                 }
                 if guess.styles.contains(&Style::Bold) {
-                    content.push_str("\x1b[1m");
+                    content.push_str("\x1b[1;32m");
                 }
                 if guess.styles.contains(&Style::Italic) {
-                    content.push_str("\x1b[34m");
+                    content.push_str("\x1b[3;34m");
                 }
                 if guess.styles.contains(&Style::Slanted) {
-                    content.push_str("\x1b[3;4m");
+                    content.push_str("\x1b[3;35m");
                 }
                 content.push(guess.chr);
             } else {

@@ -10,7 +10,7 @@ use std::io::Write;
 use std::path::Path;
 use std::time;
 
-const LINE_SPACING: u32 = 5;
+const LINE_SPACING: u32 = 10;
 
 pub struct Page {
     pub image: DynamicImage,

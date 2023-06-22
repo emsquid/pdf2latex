@@ -1,6 +1,7 @@
+use crate::args::Args;
 use crate::glyph::KnownGlyph;
 use crate::result::Result;
-use crate::{args::Args, utils::log};
+use crate::utils::log;
 use ab_glyph::{Font, FontVec};
 use std::collections::HashMap;
 use std::io::Write;
@@ -9,7 +10,6 @@ use ucd::{Codepoint, Script, UnicodeBlock, UnicodeCategory};
 
 const WHITELIST_SCRIPT: &[Script] = &[
     Script::Common,
-    Script::Cuneiform,
     Script::Gothic,
     Script::Greek,
     Script::Hebrew,
@@ -17,48 +17,46 @@ const WHITELIST_SCRIPT: &[Script] = &[
 ];
 
 const WHITELIST_BLOCK: &[UnicodeBlock] = &[
+    UnicodeBlock::AlphabeticPresentationForms,
+    UnicodeBlock::Arrows,
     UnicodeBlock::BasicLatin,
-    UnicodeBlock::Latin1Supplement,
+    UnicodeBlock::GeometricShapes,
+    UnicodeBlock::Gothic,
     UnicodeBlock::GreekandCoptic,
     UnicodeBlock::Hebrew,
     UnicodeBlock::GeneralPunctuation,
-    UnicodeBlock::SuperscriptsandSubscripts,
+    UnicodeBlock::Latin1Supplement,
     UnicodeBlock::LetterlikeSymbols,
-    UnicodeBlock::Arrows,
+    UnicodeBlock::MathematicalAlphanumericSymbols,
     UnicodeBlock::MathematicalOperators,
     UnicodeBlock::MiscellaneousMathematicalSymbolsA,
+    UnicodeBlock::MiscellaneousMathematicalSymbolsB,
+    UnicodeBlock::SuperscriptsandSubscripts,
     UnicodeBlock::SupplementalArrowsA,
     UnicodeBlock::SupplementalArrowsB,
-    UnicodeBlock::MiscellaneousMathematicalSymbolsB,
     UnicodeBlock::SupplementalMathematicalOperators,
-    UnicodeBlock::AlphabeticPresentationForms,
-    UnicodeBlock::Gothic,
-    UnicodeBlock::CuneiformNumbersandPunctuation,
-    UnicodeBlock::MathematicalAlphanumericSymbols,
-    UnicodeBlock::GeometricShapes,
 ];
 
 const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
-    UnicodeCategory::LowercaseLetter,
-    UnicodeCategory::ModifierLetter,
-    UnicodeCategory::OtherLetter,
-    UnicodeCategory::UppercaseLetter,
-    UnicodeCategory::EnclosingMark,
-    UnicodeCategory::DecimalNumber,
-    UnicodeCategory::LetterNumber,
-    UnicodeCategory::ConnectorPunctuation,
-    UnicodeCategory::DashPunctuation,
-    UnicodeCategory::OpenPunctuation,
     UnicodeCategory::ClosePunctuation,
-    UnicodeCategory::InitialPunctuation,
-    UnicodeCategory::FinalPunctuation,
-    UnicodeCategory::OtherPunctuation,
+    UnicodeCategory::ConnectorPunctuation,
     UnicodeCategory::CurrencySymbol,
+    UnicodeCategory::DashPunctuation,
+    UnicodeCategory::DecimalNumber,
+    UnicodeCategory::FinalPunctuation,
+    UnicodeCategory::InitialPunctuation,
+    UnicodeCategory::LetterNumber,
+    UnicodeCategory::LowercaseLetter,
     UnicodeCategory::MathSymbol,
+    UnicodeCategory::ModifierLetter,
+    UnicodeCategory::OpenPunctuation,
+    UnicodeCategory::OtherLetter,
+    UnicodeCategory::OtherPunctuation,
     UnicodeCategory::OtherSymbol,
+    UnicodeCategory::UppercaseLetter,
 ];
 
-const BLACKLIST: &[char] = &['·'];
+const BLACKLIST: &[char] = &[];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Code {
@@ -103,10 +101,10 @@ impl Code {
     }
 
     pub fn as_path(&self) -> String {
-        format!("fonts/{}", self.to_string())
+        format!("fonts/{self}")
     }
 
-    pub fn len() -> usize {
+    pub fn count() -> usize {
         Code::all().len()
     }
 }
@@ -141,9 +139,9 @@ impl Size {
         ]
     }
 
-    pub fn as_pt(&self, base: f32) -> f32 {
-        if (base - 10.0).abs() < f32::EPSILON {
-            match self {
+    pub fn as_pt(&self, base: u32) -> f32 {
+        match base {
+            10 => match self {
                 Size::Tiny => 5.,
                 Size::Scriptsize => 7.,
                 Size::Footnotesize => 8.,
@@ -154,9 +152,8 @@ impl Size {
                 Size::LLLarge => 17.28,
                 Size::Huge => 20.74,
                 Size::HHuge => 24.88,
-            }
-        } else if (base - 11.0).abs() < f32::EPSILON {
-            match self {
+            },
+            11 => match self {
                 Size::Tiny => 6.,
                 Size::Scriptsize => 8.,
                 Size::Footnotesize => 9.,
@@ -167,9 +164,8 @@ impl Size {
                 Size::LLLarge => 17.28,
                 Size::Huge => 20.74,
                 Size::HHuge => 24.88,
-            }
-        } else if (base - 12.0).abs() < f32::EPSILON {
-            match self {
+            },
+            12 => match self {
                 Size::Tiny => 6.,
                 Size::Scriptsize => 8.,
                 Size::Footnotesize => 10.,
@@ -179,9 +175,8 @@ impl Size {
                 Size::LLarge => 17.28,
                 Size::LLLarge => 20.74,
                 Size::Huge | Size::HHuge => 24.88,
-            }
-        } else {
-            0.
+            },
+            _ => 0.,
         }
     }
 }
@@ -238,9 +233,8 @@ impl FontBase {
                     {
                         continue;
                     }
-                    if let Some(glyph) =
-                        KnownGlyph::try_from(&font, id, chr, code, size, &styles, args)
-                    {
+                    let data = (id, chr, code, size, &styles);
+                    if let Some(glyph) = KnownGlyph::try_from(&font, data, args) {
                         let key = (glyph.rect.width, glyph.rect.height);
                         glyphs.entry(key).or_insert(Vec::new()).push(glyph);
                     }
@@ -281,6 +275,7 @@ impl FontBase {
 
     pub fn new(args: &Args) -> Result<FontBase> {
         let now = time::Instant::now();
+
         log("LOADING FONTS\n", None, None)?;
 
         let mut glyphs = HashMap::new();
@@ -289,7 +284,7 @@ impl FontBase {
         }
 
         let duration = now.elapsed().as_secs_f32();
-        log(&format!("{} LOADED", Code::len()), None, Some(duration))?;
+        log(&format!("{} LOADED", Code::count()), None, Some(duration))?;
         std::io::stdout().write_all(b"\n")?;
 
         Ok(FontBase { glyphs })

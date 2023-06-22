@@ -6,7 +6,7 @@ use ab_glyph::{Font, FontVec, GlyphId};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 use std::collections::HashMap;
 
-pub const CHAR_THRESHOLD: u8 = 75;
+pub const CHAR_THRESHOLD: u8 = 50;
 const ASCII_BONUS: f32 = 0.15;
 
 pub trait Glyph {
@@ -36,8 +36,8 @@ pub trait Glyph {
                 for (&(dx, dy), value) in &mut dist {
                     if *value < limit {
                         let v_g = self.get_pixel(x, y);
-                        let v_o = other
-                            .get_pixel(x.saturating_add_signed(dx), y.saturating_add_signed(dy));
+                        let v_o =
+                            other.get_pixel(x.wrapping_add_signed(dx), y.wrapping_add_signed(dy));
                         *value += (v_g - v_o).powf(2.);
                     }
                 }
@@ -85,16 +85,12 @@ impl Glyph for KnownGlyph {
 impl KnownGlyph {
     pub fn try_from(
         font: &FontVec,
-        id: GlyphId,
-        chr: char,
-        code: Code,
-        size: Size,
-        styles: &[Style],
+        data: (GlyphId, char, Code, Size, &Vec<Style>),
         args: &Args,
     ) -> Option<KnownGlyph> {
-        // TODO: improve scale
+        let (id, chr, code, size, styles) = data;
         let scale = font
-            .pt_to_px_scale(size.as_pt(args.size as f32) * 512. / 96.)
+            .pt_to_px_scale(size.as_pt(args.size) * 512. / 96.)
             .unwrap();
         let glyph = id.with_scale(scale);
 
@@ -113,7 +109,7 @@ impl KnownGlyph {
                 chr,
                 code,
                 size,
-                styles: styles.to_owned(),
+                styles: styles.clone(),
                 rect,
                 image: DynamicImage::ImageRgb8(image).to_luma8().into_raw(),
             })
@@ -148,7 +144,7 @@ impl UnknownGlyph {
         let x = base_pixels.iter().map(|(x, _)| *x).min().unwrap();
         let width = base_pixels.iter().map(|(px, _)| px - x + 1).max().unwrap();
 
-        Rect::new(bounds.x + x - 5, bounds.y, width + 10, bounds.height)
+        Rect::new(bounds.x + x - 7, bounds.y, width + 14, bounds.height)
     }
 
     fn find_pixels(base: Rect, image: &DynamicImage) -> Vec<(u32, u32)> {
@@ -213,16 +209,14 @@ impl UnknownGlyph {
             }
         };
 
-        let (mut code, mut size) = (None, None);
+        let (code, size) = hint.unzip();
         let mut closest = f32::MAX;
-        if let (Some((h_code, h_size)), Some(known)) = (hint, &self.guess) {
-            (code, size) = (Some(h_code), Some(h_size));
-            closest = self.distance(known, f32::MAX) * 1.1;
-            closest *= bonus(known.chr);
+        if let Some(known) = &self.guess {
+            closest = self.distance(known, f32::MAX) * 1.1 * bonus(known.chr);
         }
 
         for (&key, family) in &fontbase.glyphs {
-            if code.is_some() && key != code.unwrap() {
+            if Some(key) == code {
                 continue;
             }
 
@@ -232,7 +226,7 @@ impl UnknownGlyph {
                     let height = self.rect.height.saturating_add_signed(dh);
                     if let Some(glyphs) = family.get(&(width, height)) {
                         for glyph in glyphs {
-                            if size.is_some() && glyph.size != size.unwrap() {
+                            if Some(glyph.size) == size {
                                 continue;
                             }
 

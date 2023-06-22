@@ -11,12 +11,12 @@ mod text;
 mod utils;
 
 fn process(args: &args::Args) -> result::Result<()> {
-    let mut file = pdf::Pdf::load(&args.input)?;
+    let mut pdf = pdf::Pdf::load(&args.input)?;
 
-    file.guess(args)?;
+    pdf.guess(args)?;
     match &args.output {
-        Some(output) => file.save_content(output)?,
-        None => println!("\n{}", file.get_content()?),
+        Some(output) => pdf.save_content(output)?,
+        None => println!("\n{}", pdf.get_content()?),
     }
 
     Ok(())

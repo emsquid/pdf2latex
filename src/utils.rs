@@ -1,8 +1,10 @@
 use crate::result::{Error, Result};
 use image::{DynamicImage, GrayImage};
-use std::{
-    collections::HashMap, hash::Hash, io::Write, ops::AddAssign, path::Path, process::Command,
-};
+use std::io::Write;
+use std::ops::AddAssign;
+use std::path::Path;
+use std::process::Command;
+use std::{collections::HashMap, hash::Hash};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Rect {
@@ -33,6 +35,7 @@ fn split(buffer: &[u8], delimiter: u8) -> Vec<&[u8]> {
 
 fn buffer_to_usize(buffer: &[u8]) -> Result<usize> {
     let result = String::from_utf8_lossy(buffer).parse()?;
+
     Ok(result)
 }
 
@@ -154,7 +157,7 @@ pub fn log(message: &str, progress: Option<f32>, duration: Option<f32>) -> Resul
             stdout.write_all(format!("{message} \t[{bar}] {percent}%").as_bytes())
         }
         (None, Some(duration)) => stdout.write_all(format!("{message} in {duration}s").as_bytes()),
-        (None, None) => stdout.write_all(format!("{message}").as_bytes()),
+        (None, None) => stdout.write_all(message.as_bytes()),
     }?;
     stdout.flush()?;
 
