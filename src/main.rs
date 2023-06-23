@@ -18,6 +18,7 @@ fn process(args: &args::Args) -> result::Result<()> {
         Some(output) => pdf.save_content(output)?,
         None => println!("\n{}", pdf.get_content()?),
     }
+    pdf.pages[0].debug_avg();
 
     Ok(())
 }

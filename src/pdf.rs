@@ -73,10 +73,6 @@ impl Page {
             log("converting text", Some(1.), Some(duration))?;
             std::io::stdout().write_all(b"\n")?;
 
-            let d: f32 = self.lines.iter().map(|l| l.get_dist_sum()).sum();
-            let n: u32 = self.lines.iter().map(|l| l.get_letter_count()).sum();
-            println!("distance moyenne : {}", d / n as f32);
-
             Ok(())
         })
     }
@@ -125,6 +121,13 @@ impl Page {
         }
 
         copy
+    }
+
+    pub fn debug_avg(&self) {
+        let data = (self.lines).iter().map(|l| (l.get_dist_sum(), l.get_letter_count()));
+        let d: f32 = data.clone().map(|d| d.0).sum();
+        let n: u32 = data.map(|d| d.1).sum();
+        println!("distance moyenne : {}", d / n as f32);
     }
 }
 

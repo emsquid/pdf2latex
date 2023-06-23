@@ -6,6 +6,7 @@ use ab_glyph::{Font, FontVec, GlyphId};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 use std::collections::HashMap;
 
+pub const DIST_THRESHOLD: f32 = 1.;
 pub const CHAR_THRESHOLD: u8 = 50;
 const ASCII_BONUS: f32 = 0.15;
 
@@ -222,8 +223,8 @@ impl UnknownGlyph {
                 continue;
             }
 
-            for dw in -1..=1 {
-                for dh in -1..=1 {
+            'outer: for dw in [0,-1,1,-2,2] {
+                for dh in [0,-1,1,-2,2] {
                     let width = self.rect.width.saturating_add_signed(dw);
                     let height = self.rect.height.saturating_add_signed(dh);
                     if let Some(glyphs) = family.get(&(width, height)) {
@@ -238,6 +239,9 @@ impl UnknownGlyph {
                                 closest = dist;
                                 self.dist = Some(dist);
                                 self.guess = Some(glyph.clone());
+                            }
+                            if dist < DIST_THRESHOLD {
+                                break 'outer
                             }
                         }
                     }
