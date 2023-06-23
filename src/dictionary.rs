@@ -19,7 +19,11 @@ pub struct Dictionary {
 impl Dictionary {
     pub fn new() -> Result<Dictionary> {
         let file = std::fs::read_to_string("words.txt")?;
-        let words = file.split('\n').map(String::from).collect();
+        let mut words = file
+            .split(['\r', '\n'])
+            .map(String::from)
+            .collect::<Vec<String>>();
+        words.retain(|word| !word.is_empty());
 
         Ok(Dictionary { words })
     }
@@ -47,11 +51,11 @@ impl Dictionary {
 
     fn correct_word(&self, guess: &str) -> String {
         let mut best_match: String = String::new();
-        if guess.chars().all(|chr| chr.is_ascii()) {
+        if guess.chars().all(|chr| chr.is_ascii_alphabetic()) {
             let mut best_dist: f64 = 0.;
             for word in &self.words {
-                if (best_dist - 1.0).abs() < f64::EPSILON && word.len() == guess.len() {
-                    let dist: f64 = jaro_winkler(&guess.to_lowercase(), word);
+                if (best_dist - 1.0).abs() > f64::EPSILON && word.len() == guess.len() {
+                    let dist: f64 = jaro_winkler(&guess.to_ascii_lowercase(), word);
                     if dist > best_dist {
                         best_dist = dist;
                         best_match = word.clone();
@@ -77,22 +81,22 @@ impl Dictionary {
         let mut corrected: String = String::new();
         let (splitters, mut punct) = self.get_punctuation(guess);
 
-        let mut split: Vec<&str> = guess.split(splitters.as_slice()).collect();
-        split.retain(|part| !part.is_empty());
+        let mut words: Vec<&str> = guess.split(splitters.as_slice()).collect();
+        words.retain(|part| !part.is_empty());
 
         let mut is_punct_turn: bool =
             PUNCTUATION.contains(&guess.chars().next().unwrap().category());
 
-        while !split.is_empty() || !punct.is_empty() {
-            if split.is_empty() {
+        while !words.is_empty() || !punct.is_empty() {
+            if words.is_empty() {
                 corrected.push_str(&punct.remove(0));
             } else if punct.is_empty() {
-                corrected.push_str(&self.correct_word(split.remove(0)));
+                corrected.push_str(&self.correct_word(words.remove(0)));
             } else {
                 if is_punct_turn {
                     corrected.push_str(&punct.remove(0));
                 } else {
-                    corrected.push_str(&self.correct_word(split.remove(0)));
+                    corrected.push_str(&self.correct_word(words.remove(0)));
                 }
                 is_punct_turn = !is_punct_turn;
             }
