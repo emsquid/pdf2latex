@@ -46,10 +46,10 @@ impl Word {
             glyph.try_guess(fontbase, length, None);
         }
 
-        let hint = Option::zip(self.get_code(), self.get_size());
-        for glyph in &mut self.glyphs {
-            glyph.try_guess(fontbase, length, hint);
-        }
+        // let hint = Option::zip(self.get_code(), self.get_size());
+        // for glyph in &mut self.glyphs {
+        // glyph.try_guess(fontbase, length, hint);
+        // }
     }
 
     pub fn get_code(&self) -> Option<Code> {
@@ -100,7 +100,10 @@ impl Word {
     }
 
     pub fn get_dist_sum(&self) -> f32 {
-        return self.glyphs.iter().map(|g| g.dist.unwrap_or(0.)).sum();
+        self.glyphs
+            .iter()
+            .map(|glyph| glyph.dist.unwrap_or(0.))
+            .sum()
     }
 }
 
@@ -144,9 +147,10 @@ impl Line {
     }
 
     pub fn get_dist_sum(&self) -> f32 {
-        return self.words.iter().map(|w| w.get_dist_sum()).sum();
+        self.words.iter().map(|word| word.get_dist_sum()).sum()
     }
-    pub fn get_letter_count(&self) -> u32 {
-        return self.words.iter().map(|w| w.glyphs.len() as u32).sum();
+
+    pub fn get_glyph_count(&self) -> u32 {
+        self.words.iter().map(|word| word.glyphs.len() as u32).sum()
     }
 }

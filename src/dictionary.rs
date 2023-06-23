@@ -1,7 +1,6 @@
+use crate::result::Result;
 use strsim::jaro_winkler;
 use ucd::{Codepoint, UnicodeCategory};
-
-use crate::result::Result;
 
 const PUNCTUATION: &[UnicodeCategory] = &[
     UnicodeCategory::ConnectorPunctuation,
@@ -10,7 +9,7 @@ const PUNCTUATION: &[UnicodeCategory] = &[
     UnicodeCategory::FinalPunctuation,
     UnicodeCategory::InitialPunctuation,
     UnicodeCategory::OtherPunctuation,
-    UnicodeCategory::OpenPunctuation
+    UnicodeCategory::OpenPunctuation,
 ];
 
 pub struct Dictionary {
@@ -25,82 +24,75 @@ impl Dictionary {
         Ok(Dictionary { words })
     }
 
-    fn get_punct_to_split_on(&self, guess: &str) -> (Vec<char>, Vec<String>){
-        let mut char_sequence: Vec<String> = Vec::new();
-        let mut chars_to_split: Vec<char> = Vec::new();
+    fn get_punctuation(&self, word: &str) -> (Vec<char>, Vec<String>) {
+        let mut splitters: Vec<char> = Vec::new();
+        let mut sequences: Vec<String> = Vec::new();
         let mut was_last_ponct: bool = false;
-        for chr in guess.chars(){
-            if PUNCTUATION.contains(&chr.category()){
+        for chr in word.chars() {
+            if PUNCTUATION.contains(&chr.category()) {
                 if was_last_ponct {
-                    char_sequence.last_mut().unwrap().push(chr);
-                }
-                else {
-                    char_sequence.push(chr.to_string());
+                    sequences.last_mut().unwrap().push(chr);
+                } else {
+                    sequences.push(chr.to_string());
                 }
                 was_last_ponct = true;
-                chars_to_split.push(chr);
-            }
-            else {
+                splitters.push(chr);
+            } else {
                 was_last_ponct = false;
             }
         }
-        (chars_to_split, char_sequence)
+
+        (splitters, sequences)
     }
 
-    fn correct_word(&self,guess: &str) -> String{
-        let mut best_word: String = String::new();
-        if guess.chars().all(|chr| chr.is_ascii()){
-            let mut dist_max: f64 = 0.0;
-            let mut uppercases: Vec<bool> = vec![false; guess.len()];
-
-            for(i, chr) in guess.char_indices(){
-                if chr.is_uppercase() {uppercases[i] = true;}
-            }
-
-            for word in &self.words{
-                if word.len() == guess.len() && dist_max != 1.0{
-                    let dist: f64 = jaro_winkler(&guess.to_ascii_lowercase(), &word);
-                    if dist > dist_max {
-                        dist_max = dist;
-                        best_word = word.clone();
+    fn correct_word(&self, guess: &str) -> String {
+        let mut best_match: String = String::new();
+        if guess.chars().all(|chr| chr.is_ascii()) {
+            let mut best_dist: f64 = 0.;
+            for word in &self.words {
+                if (best_dist - 1.0).abs() < f64::EPSILON && word.len() == guess.len() {
+                    let dist: f64 = jaro_winkler(&guess.to_lowercase(), word);
+                    if dist > best_dist {
+                        best_dist = dist;
+                        best_match = word.clone();
                     }
                 }
             }
 
-            for i in 0..uppercases.len(){
-                if uppercases[i]{
-                    best_word.get_mut(i..=i).map(|chr| {chr.make_ascii_uppercase();});
+            let iter = guess.chars().zip(best_match.chars());
+            iter.map(|(original, new)| {
+                if original.is_uppercase() {
+                    new.to_ascii_uppercase()
+                } else {
+                    new
                 }
-            } 
-            return best_word
-        }
-        else{
-            return guess.to_string()
+            })
+            .collect()
+        } else {
+            guess.to_string()
         }
     }
 
     pub fn correct_guess(&self, guess: &str) -> String {
         let mut corrected: String = String::new();
-        let (spliters, mut punct) = self.get_punct_to_split_on(guess);
+        let (splitters, mut punct) = self.get_punctuation(guess);
 
-        let mut arrays: Vec<&str> = guess.split(spliters.as_slice()).collect();
-        arrays = arrays.iter().map(|x|*x).filter(|x| !x.is_empty()).collect();
+        let mut split: Vec<&str> = guess.split(splitters.as_slice()).collect();
+        split.retain(|part| !part.is_empty());
 
-        let mut is_punct_turn: bool = PUNCTUATION.contains(&guess.chars().next().unwrap().category());
+        let mut is_punct_turn: bool =
+            PUNCTUATION.contains(&guess.chars().next().unwrap().category());
 
-        while !arrays.is_empty() || !punct.is_empty(){
-            if arrays.is_empty(){
+        while !split.is_empty() || !punct.is_empty() {
+            if split.is_empty() {
                 corrected.push_str(&punct.remove(0));
-            }
-            else if punct.is_empty() {
-                corrected.push_str(&self.correct_word(arrays.remove(0)));
-            }
-            else{
-                if is_punct_turn{
+            } else if punct.is_empty() {
+                corrected.push_str(&self.correct_word(split.remove(0)));
+            } else {
+                if is_punct_turn {
                     corrected.push_str(&punct.remove(0));
-                }
-                else{
-                    corrected.push_str(&self.correct_word(arrays.remove(0)));
+                } else {
+                    corrected.push_str(&self.correct_word(split.remove(0)));
                 }
                 is_punct_turn = !is_punct_turn;
             }

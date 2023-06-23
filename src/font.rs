@@ -56,7 +56,7 @@ const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
     UnicodeCategory::UppercaseLetter,
 ];
 
-const BLACKLIST: &[char] = &[];
+const BLACKLIST: &[char] = &['·'];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Code {
@@ -253,6 +253,7 @@ impl FontBase {
         let mut progress = 0.;
 
         std::io::stdout().write_all(b"\x1b[s")?;
+        std::io::stdout().flush()?;
         log(&format!("loading font {code}"), Some(0.), None)?;
 
         let mut family = HashMap::new();

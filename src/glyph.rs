@@ -6,7 +6,7 @@ use ab_glyph::{Font, FontVec, GlyphId};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 use std::collections::HashMap;
 
-pub const DIST_THRESHOLD: f32 = 1.;
+pub const DIST_THRESHOLD: f32 = 0.5;
 pub const CHAR_THRESHOLD: u8 = 50;
 const ASCII_BONUS: f32 = 0.15;
 
@@ -124,8 +124,8 @@ impl KnownGlyph {
 pub struct UnknownGlyph {
     pub rect: Rect,
     pub image: Vec<u8>,
-    pub dist: Option<f32>,
 
+    pub dist: Option<f32>,
     pub guess: Option<KnownGlyph>,
 }
 
@@ -213,35 +213,32 @@ impl UnknownGlyph {
         };
 
         let (code, size) = hint.unzip();
-        let mut closest = f32::MAX;
-        if let Some(known) = &self.guess {
-            closest = self.distance(known, f32::MAX) * 1.1 * bonus(known.chr);
-        }
-
+        let mut closest = self.dist.unwrap_or(f32::MAX / 1.1) * 1.1;
         for (&key, family) in &fontbase.glyphs {
-            if Some(key) == code {
+            if code.is_some() && Some(key) != code {
                 continue;
             }
 
-            'outer: for dw in [0,-1,1,-2,2] {
-                for dh in [0,-1,1,-2,2] {
+            for dw in [0, -1, 1, -2, 2] {
+                for dh in [0, -1, 1, -2, 2] {
                     let width = self.rect.width.saturating_add_signed(dw);
                     let height = self.rect.height.saturating_add_signed(dh);
                     if let Some(glyphs) = family.get(&(width, height)) {
                         for glyph in glyphs {
-                            if Some(glyph.size) == size {
+                            if size.is_some() && Some(glyph.size) != size {
                                 continue;
                             }
 
-                            let dist = self.distance(glyph, closest / (1.0 - ASCII_BONUS))
+                            let dist = self.distance(glyph, closest / (1. - ASCII_BONUS))
                                 * bonus(glyph.chr);
                             if dist < closest {
                                 closest = dist;
                                 self.dist = Some(dist);
                                 self.guess = Some(glyph.clone());
                             }
+
                             if dist < DIST_THRESHOLD {
-                                break 'outer
+                                return;
                             }
                         }
                     }

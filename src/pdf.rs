@@ -42,6 +42,7 @@ impl Page {
             let step = 1. / self.lines.len() as f32;
 
             std::io::stdout().write_all(b"\n\x1b[s")?;
+            std::io::stdout().flush()?;
             log("creating threads", Some(0.), None)?;
 
             let mut handles = Vec::new();
@@ -60,6 +61,7 @@ impl Page {
             progress = 0.;
 
             std::io::stdout().write_all(b"\n\x1b[s")?;
+            std::io::stdout().flush()?;
             log("converting text", Some(0.), None)?;
 
             for handle in handles {
@@ -123,11 +125,11 @@ impl Page {
         copy
     }
 
-    pub fn debug_avg(&self) {
-        let data = (self.lines).iter().map(|l| (l.get_dist_sum(), l.get_letter_count()));
-        let d: f32 = data.clone().map(|d| d.0).sum();
-        let n: u32 = data.map(|d| d.1).sum();
-        println!("distance moyenne : {}", d / n as f32);
+    pub fn debug_dist_avg(&self) {
+        let data = self.lines.iter().fold((0., 0), |acc, line| {
+            (acc.0 + line.get_dist_sum(), acc.1 + line.get_glyph_count())
+        });
+        println!("distance moyenne : {}", data.0 / data.1 as f32);
     }
 }
 

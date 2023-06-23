@@ -74,7 +74,7 @@ pub fn find_parts(gray: &GrayImage, spacing: u32) -> Vec<(u32, u32)> {
     let mut end = 0;
 
     for (i, row) in gray.enumerate_rows() {
-        let average = row.map(|l| u32::from(l.2 .0[0])).sum::<u32>() / gray.width();
+        let average = row.fold(0, |acc, line| acc + u32::from(line.2 .0[0])) / gray.width();
         if start != 0 && average == 255 {
             if end == 0 {
                 end = i;
@@ -139,6 +139,7 @@ pub fn average<T: Eq + Hash>(list: Vec<T>) -> T {
 
 pub fn log(message: &str, progress: Option<f32>, duration: Option<f32>) -> Result<()> {
     let mut stdout = std::io::stdout();
+
     stdout.write_all(b"\x1b[u")?;
     match (progress, duration) {
         (Some(progress), Some(duration)) => {
