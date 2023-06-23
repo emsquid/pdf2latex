@@ -1,3 +1,6 @@
+use clap::Parser;
+
+mod args;
 mod dictionary;
 mod font;
 mod glyph;
@@ -7,19 +10,20 @@ mod result;
 mod text;
 mod utils;
 
-fn process(path: &str) -> result::Result<()> {
-    let mut file = pdf::Pdf::load(path)?;
-    file.guess()?;
+fn process(args: &args::Args) -> result::Result<()> {
+    let mut pdf = pdf::Pdf::load(&args.input)?;
 
-    // file.pages[0].lines[1].words[0].glyphs[0].save("test/debug1.png")?;
-    file.pages[0].debug().save("test/debug.png")?;
-    println!("{}", file.get_content()?);
+    pdf.guess(args)?;
+    match &args.output {
+        Some(output) => pdf.save_content(output)?,
+        None => println!("\n{}", pdf.get_content()?),
+    }
 
     Ok(())
 }
 
 fn main() {
-    if let Err(err) = process("test/test_3-2_toLatex.pdf") {
+    if let Err(err) = process(&args::Args::parse()) {
         eprintln!("{err}");
     }
 }

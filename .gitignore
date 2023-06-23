@@ -1,8 +1,9 @@
 __pycache__
 python/temp/*
 test.py
-test/debug.png
-test/guess*
+
+test/*
+!test/*.pdf
 
 target
 Cargo.lock
