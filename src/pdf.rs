@@ -109,6 +109,9 @@ impl Page {
             ).as_bytes()).unwrap();
             stdout.flush().unwrap();
         });
+        let d: f32 = self.lines.iter().map(|l| l.get_dist_sum()).sum();
+        let n: u32 = self.lines.iter().map(|l| l.get_letter_count()).sum();
+        println!("distance moyenne : {}", d / n as f32)
     }
 
     pub fn get_content(&self, dictionary: &Dictionary) -> String {

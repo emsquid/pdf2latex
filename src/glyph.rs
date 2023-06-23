@@ -123,6 +123,7 @@ impl KnownGlyph {
 pub struct UnknownGlyph {
     pub rect: Rect,
     pub image: Vec<u8>,
+    pub dist: Option<f32>,
 
     pub guess: Option<KnownGlyph>,
 }
@@ -218,6 +219,7 @@ impl UnknownGlyph {
         UnknownGlyph {
             rect: Rect::new(x, y, width, height),
             image: DynamicImage::ImageRgb8(glyph_image).to_luma8().into_raw(),
+            dist: None,
             guess: None,
         }
     }
@@ -263,6 +265,7 @@ impl UnknownGlyph {
                                 * bonus(glyph.chr);
                             if dist < closest {
                                 closest = dist;
+                                self.dist = Some(dist);
                                 self.guess = Some(glyph.clone());
                             }
                         }
