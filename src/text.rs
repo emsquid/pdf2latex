@@ -4,7 +4,7 @@ use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
 
-const WORD_SPACING: u32 = 12;
+const WORD_SPACING: u32 = 15;
 
 pub struct Word {
     pub rect: Rect,
@@ -80,13 +80,13 @@ impl Word {
                     content.push_str("\x1b[31m");
                 }
                 if guess.styles.contains(&Style::Bold) {
-                    content.push_str("\x1b[1m");
+                    content.push_str("\x1b[1;32m");
                 }
                 if guess.styles.contains(&Style::Italic) {
-                    content.push_str("\x1b[3m");
+                    content.push_str("\x1b[3;34m");
                 }
                 if guess.styles.contains(&Style::Slanted) {
-                    content.push_str("\x1b[3;4m");
+                    content.push_str("\x1b[3;35m");
                 }
                 content.push(guess.chr);
             } else {
@@ -97,6 +97,10 @@ impl Word {
         }
 
         content
+    }
+
+    pub fn get_dist_sum(&self) -> f32 {
+        return self.glyphs.iter().map(|g| g.dist.unwrap_or(0.)).sum();
     }
 }
 
@@ -137,5 +141,12 @@ impl Line {
         }
 
         content
+    }
+
+    pub fn get_dist_sum(&self) -> f32 {
+        return self.words.iter().map(|w| w.get_dist_sum()).sum();
+    }
+    pub fn get_letter_count(&self) -> u32 {
+        return self.words.iter().map(|w| w.glyphs.len() as u32).sum();
     }
 }

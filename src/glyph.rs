@@ -1,12 +1,65 @@
+use crate::args::Args;
 use crate::font::{Code, FontBase, Size, Style};
 use crate::result::Result;
 use crate::utils::{flood_fill, Rect};
 use ab_glyph::{Font, FontVec, GlyphId};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
-use std::ops::MulAssign;
+use std::collections::HashMap;
 
-pub const CHAR_THRESHOLD: u8 = 175;
-const ASCII_BONUS: f32 = 0.25;
+pub const CHAR_THRESHOLD: u8 = 50;
+const ASCII_BONUS: f32 = 0.15;
+
+pub trait Glyph {
+    fn rect(&self) -> &Rect;
+    fn image(&self) -> &Vec<u8>;
+
+    fn get_pixel(&self, x: u32, y: u32) -> f32 {
+        if x >= self.rect().width || y >= self.rect().height {
+            1.
+        } else {
+            f32::from(self.image()[(x + y * self.rect().width) as usize]) / 255.
+        }
+    }
+
+    fn distance(&self, other: &dyn Glyph, limit: f32) -> f32 {
+        let mut dist = HashMap::new();
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                dist.insert((dx, dy), 0.);
+            }
+        }
+
+        let width = u32::max(self.rect().width, other.rect().width);
+        let height = u32::max(self.rect().height, other.rect().height);
+        for x in 0..width {
+            for y in 0..height {
+                for (&(dx, dy), value) in &mut dist {
+                    if *value < limit {
+                        let v_g = self.get_pixel(x, y);
+                        let v_o =
+                            other.get_pixel(x.wrapping_add_signed(dx), y.wrapping_add_signed(dy));
+                        *value += (v_g - v_o).powf(2.);
+                    }
+                }
+            }
+        }
+
+        *dist.values().min_by(|a, b| a.total_cmp(b)).unwrap()
+    }
+
+    fn save(&self, path: &str) -> Result<()> {
+        image::save_buffer_with_format(
+            path,
+            self.image(),
+            self.rect().width,
+            self.rect().height,
+            image::ColorType::L8,
+            image::ImageFormat::Png,
+        )?;
+
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct KnownGlyph {
@@ -19,17 +72,26 @@ pub struct KnownGlyph {
     pub image: Vec<u8>,
 }
 
+impl Glyph for KnownGlyph {
+    fn rect(&self) -> &Rect {
+        &self.rect
+    }
+
+    fn image(&self) -> &Vec<u8> {
+        &self.image
+    }
+}
+
 impl KnownGlyph {
     pub fn try_from(
         font: &FontVec,
-        id: GlyphId,
-        chr: char,
-        code: Code,
-        size: Size,
-        styles: &[Style],
+        data: (GlyphId, char, Code, Size, &Vec<Style>),
+        args: &Args,
     ) -> Option<KnownGlyph> {
-        // TODO: improve scale
-        let scale = font.pt_to_px_scale(size.as_pt() * 400. / 96.).unwrap();
+        let (id, chr, code, size, styles) = data;
+        let scale = font
+            .pt_to_px_scale(size.as_pt(args.size) * 512. / 96.)
+            .unwrap();
         let glyph = id.with_scale(scale);
 
         if let Some(outlined) = font.outline_glyph(glyph) {
@@ -47,7 +109,7 @@ impl KnownGlyph {
                 chr,
                 code,
                 size,
-                styles: styles.to_owned(),
+                styles: styles.clone(),
                 rect,
                 image: DynamicImage::ImageRgb8(image).to_luma8().into_raw(),
             })
@@ -55,27 +117,25 @@ impl KnownGlyph {
             None
         }
     }
-
-    pub fn save(&self, path: &str) -> Result<()> {
-        image::save_buffer_with_format(
-            path,
-            &self.image,
-            self.rect.width,
-            self.rect.height,
-            image::ColorType::L8,
-            image::ImageFormat::Png,
-        )?;
-
-        Ok(())
-    }
 }
 
 #[derive(Clone)]
 pub struct UnknownGlyph {
     pub rect: Rect,
     pub image: Vec<u8>,
+    pub dist: Option<f32>,
 
     pub guess: Option<KnownGlyph>,
+}
+
+impl Glyph for UnknownGlyph {
+    fn rect(&self) -> &Rect {
+        &self.rect
+    }
+
+    fn image(&self) -> &Vec<u8> {
+        &self.image
+    }
 }
 
 impl UnknownGlyph {
@@ -85,7 +145,7 @@ impl UnknownGlyph {
         let x = base_pixels.iter().map(|(x, _)| *x).min().unwrap();
         let width = base_pixels.iter().map(|(px, _)| px - x + 1).max().unwrap();
 
-        Rect::new(bounds.x + x - 5, bounds.y, width + 10, bounds.height)
+        Rect::new(bounds.x + x - 7, bounds.y, width + 14, bounds.height)
     }
 
     fn find_pixels(base: Rect, image: &DynamicImage) -> Vec<(u32, u32)> {
@@ -132,36 +192,9 @@ impl UnknownGlyph {
         UnknownGlyph {
             rect: Rect::new(x, y, width, height),
             image: DynamicImage::ImageRgb8(glyph_image).to_luma8().into_raw(),
+            dist: None,
             guess: None,
         }
-    }
-
-    fn distance(&self, other: &KnownGlyph) -> f32 {
-        let width = u32::max(self.rect.width, other.rect.width);
-        let height = u32::max(self.rect.height, other.rect.height);
-
-        let mut dist = 0.;
-        for x in 0..width {
-            for y in 0..height {
-                if x < self.rect.width
-                    && y < self.rect.height
-                    && x < other.rect.width
-                    && y < other.rect.height
-                {
-                    let v_g = f32::from(self.image[(x + y * self.rect.width) as usize]) / 255.;
-                    let v_o = f32::from(other.image[(x + y * other.rect.width) as usize]) / 255.;
-                    dist += (v_g - v_o).powf(2.);
-                } else if x < self.rect.width && y < self.rect.height {
-                    let v_g = f32::from(self.image[(x + y * self.rect.width) as usize]) / 255.;
-                    dist += (1. - v_g).powf(2.);
-                } else if x < other.rect.width && y < other.rect.height {
-                    let v_o = f32::from(other.image[(x + y * other.rect.width) as usize]) / 255.;
-                    dist += (1. - v_o).powf(2.);
-                }
-            }
-        }
-
-        dist
     }
 
     pub fn try_guess(
@@ -170,40 +203,40 @@ impl UnknownGlyph {
         word_length: usize,
         hint: Option<(Code, Size)>,
     ) {
-        // check if distance deserves a bonus
-        let bonus = |dist: &mut f32, chr: char| {
+        let bonus = |chr: char| {
             if chr.is_ascii() && word_length > 1 {
-                dist.mul_assign(1. - ASCII_BONUS);
+                1. - ASCII_BONUS
+            } else {
+                1.
             }
         };
 
-        let (mut code, mut size) = (None, None);
+        let (code, size) = hint.unzip();
         let mut closest = f32::MAX;
-        if let (Some((h_code, h_size)), Some(known)) = (hint, &self.guess) {
-            (code, size) = (Some(h_code), Some(h_size));
-            closest = self.distance(known) * 1.05;
-            bonus(&mut closest, known.chr);
+        if let Some(known) = &self.guess {
+            closest = self.distance(known, f32::MAX) * 1.1 * bonus(known.chr);
         }
 
         for (&key, family) in &fontbase.glyphs {
-            if code.is_some() && key != code.unwrap() {
+            if Some(key) == code {
                 continue;
             }
 
-            for dw in -2..=2 {
-                for dh in -2..=2 {
+            for dw in -1..=1 {
+                for dh in -1..=1 {
                     let width = self.rect.width.saturating_add_signed(dw);
                     let height = self.rect.height.saturating_add_signed(dh);
                     if let Some(glyphs) = family.get(&(width, height)) {
                         for glyph in glyphs {
-                            if size.is_some() && glyph.size != size.unwrap() {
+                            if Some(glyph.size) == size {
                                 continue;
                             }
 
-                            let mut dist = self.distance(glyph);
-                            bonus(&mut dist, glyph.chr);
+                            let dist = self.distance(glyph, closest / (1.0 - ASCII_BONUS))
+                                * bonus(glyph.chr);
                             if dist < closest {
                                 closest = dist;
+                                self.dist = Some(dist);
                                 self.guess = Some(glyph.clone());
                             }
                         }
@@ -211,18 +244,5 @@ impl UnknownGlyph {
                 }
             }
         }
-    }
-
-    pub fn save(&self, path: &str) -> Result<()> {
-        image::save_buffer_with_format(
-            path,
-            &self.image,
-            self.rect.width,
-            self.rect.height,
-            image::ColorType::L8,
-            image::ImageFormat::Png,
-        )?;
-
-        Ok(())
     }
 }

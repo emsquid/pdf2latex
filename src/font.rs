@@ -1,12 +1,15 @@
+use crate::args::Args;
 use crate::glyph::KnownGlyph;
 use crate::result::Result;
+use crate::utils::log;
 use ab_glyph::{Font, FontVec};
 use std::collections::HashMap;
+use std::io::Write;
+use std::time;
 use ucd::{Codepoint, Script, UnicodeBlock, UnicodeCategory};
 
 const WHITELIST_SCRIPT: &[Script] = &[
     Script::Common,
-    Script::Cuneiform,
     Script::Gothic,
     Script::Greek,
     Script::Hebrew,
@@ -14,59 +17,73 @@ const WHITELIST_SCRIPT: &[Script] = &[
 ];
 
 const WHITELIST_BLOCK: &[UnicodeBlock] = &[
+    UnicodeBlock::AlphabeticPresentationForms,
+    UnicodeBlock::Arrows,
     UnicodeBlock::BasicLatin,
-    UnicodeBlock::Latin1Supplement,
-    UnicodeBlock::LatinExtendedA,
-    UnicodeBlock::LatinExtendedB,
-    UnicodeBlock::LatinExtendedC,
-    UnicodeBlock::IPAExtensions,
+    UnicodeBlock::GeometricShapes,
+    UnicodeBlock::Gothic,
     UnicodeBlock::GreekandCoptic,
     UnicodeBlock::Hebrew,
-    UnicodeBlock::LatinExtendedAdditional,
     UnicodeBlock::GeneralPunctuation,
-    UnicodeBlock::SuperscriptsandSubscripts,
+    UnicodeBlock::Latin1Supplement,
     UnicodeBlock::LetterlikeSymbols,
-    UnicodeBlock::Arrows,
+    UnicodeBlock::MathematicalAlphanumericSymbols,
     UnicodeBlock::MathematicalOperators,
     UnicodeBlock::MiscellaneousMathematicalSymbolsA,
+    UnicodeBlock::MiscellaneousMathematicalSymbolsB,
+    UnicodeBlock::SuperscriptsandSubscripts,
     UnicodeBlock::SupplementalArrowsA,
     UnicodeBlock::SupplementalArrowsB,
-    UnicodeBlock::MiscellaneousMathematicalSymbolsB,
     UnicodeBlock::SupplementalMathematicalOperators,
-    UnicodeBlock::AlphabeticPresentationForms,
-    UnicodeBlock::Gothic,
-    UnicodeBlock::CuneiformNumbersandPunctuation,
-    UnicodeBlock::MathematicalAlphanumericSymbols,
 ];
 
 const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
-    UnicodeCategory::LowercaseLetter,
-    UnicodeCategory::ModifierLetter,
-    UnicodeCategory::OtherLetter,
-    UnicodeCategory::UppercaseLetter,
-    UnicodeCategory::EnclosingMark,
-    UnicodeCategory::DecimalNumber,
-    UnicodeCategory::LetterNumber,
-    UnicodeCategory::ConnectorPunctuation,
-    UnicodeCategory::DashPunctuation,
-    UnicodeCategory::OpenPunctuation,
     UnicodeCategory::ClosePunctuation,
-    UnicodeCategory::InitialPunctuation,
-    UnicodeCategory::FinalPunctuation,
-    UnicodeCategory::OtherPunctuation,
+    UnicodeCategory::ConnectorPunctuation,
     UnicodeCategory::CurrencySymbol,
+    UnicodeCategory::DashPunctuation,
+    UnicodeCategory::DecimalNumber,
+    UnicodeCategory::FinalPunctuation,
+    UnicodeCategory::InitialPunctuation,
+    UnicodeCategory::LetterNumber,
+    UnicodeCategory::LowercaseLetter,
     UnicodeCategory::MathSymbol,
+    UnicodeCategory::ModifierLetter,
+    UnicodeCategory::OpenPunctuation,
+    UnicodeCategory::OtherLetter,
+    UnicodeCategory::OtherPunctuation,
     UnicodeCategory::OtherSymbol,
+    UnicodeCategory::UppercaseLetter,
 ];
+
+const BLACKLIST: &[char] = &[];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Code {
     Cmr,
     Lmr,
+    Put,
     Qag,
     Qcr,
+    Qcs,
     Qpl,
-    Xits,
+    // Xits,
+}
+
+impl std::fmt::Display for Code {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let string = match self {
+            Code::Cmr => "cmr",
+            Code::Lmr => "lmr",
+            Code::Put => "put",
+            Code::Qag => "qag",
+            Code::Qcr => "qcr",
+            Code::Qcs => "qcs",
+            Code::Qpl => "qpl",
+            // Code::Xits => "xits",
+        };
+        write!(f, "{string}")
+    }
 }
 
 impl Code {
@@ -74,33 +91,21 @@ impl Code {
         vec![
             Code::Cmr,
             Code::Lmr,
+            Code::Put,
             Code::Qag,
             Code::Qcr,
+            Code::Qcs,
             Code::Qpl,
-            Code::Xits,
+            // Code::Xits,
         ]
     }
 
-    pub fn to_string(&self) -> &'static str {
-        match self {
-            Code::Cmr => "cmr",
-            Code::Lmr => "lmr",
-            Code::Qag => "qag",
-            Code::Qcr => "qcr",
-            Code::Qpl => "qpl",
-            Code::Xits => "xits",
-        }
+    pub fn as_path(&self) -> String {
+        format!("fonts/{self}")
     }
 
-    pub fn as_path(&self) -> &'static str {
-        match self {
-            Code::Cmr => "fonts/cmr",
-            Code::Lmr => "fonts/lmr",
-            Code::Qag => "fonts/qag",
-            Code::Qcr => "fonts/qcr",
-            Code::Qpl => "fonts/qpl",
-            Code::Xits => "fonts/xits",
-        }
+    pub fn count() -> usize {
+        Code::all().len()
     }
 }
 
@@ -134,22 +139,45 @@ impl Size {
         ]
     }
 
-    pub fn as_pt(&self) -> f32 {
-        let base = 12.0;
-        let delta = match self {
-            Size::Tiny => -5.0,
-            Size::Scriptsize => -3.25,
-            Size::Footnotesize => -2.0,
-            Size::Small => -1.0,
-            Size::Normalsize => 0.0,
-            Size::Large => 2.0,
-            Size::LLarge => 4.4,
-            Size::LLLarge => 7.28,
-            Size::Huge => 10.74,
-            Size::HHuge => 14.88,
-        };
-
-        base + delta
+    pub fn as_pt(&self, base: u32) -> f32 {
+        match base {
+            10 => match self {
+                Size::Tiny => 5.,
+                Size::Scriptsize => 7.,
+                Size::Footnotesize => 8.,
+                Size::Small => 9.,
+                Size::Normalsize => 10.,
+                Size::Large => 12.,
+                Size::LLarge => 14.4,
+                Size::LLLarge => 17.28,
+                Size::Huge => 20.74,
+                Size::HHuge => 24.88,
+            },
+            11 => match self {
+                Size::Tiny => 6.,
+                Size::Scriptsize => 8.,
+                Size::Footnotesize => 9.,
+                Size::Small => 10.,
+                Size::Normalsize => 10.95,
+                Size::Large => 12.,
+                Size::LLarge => 14.4,
+                Size::LLLarge => 17.28,
+                Size::Huge => 20.74,
+                Size::HHuge => 24.88,
+            },
+            12 => match self {
+                Size::Tiny => 6.,
+                Size::Scriptsize => 8.,
+                Size::Footnotesize => 10.,
+                Size::Small => 10.95,
+                Size::Normalsize => 12.,
+                Size::Large => 14.4,
+                Size::LLarge => 17.28,
+                Size::LLLarge => 20.74,
+                Size::Huge | Size::HHuge => 24.88,
+            },
+            _ => 0.,
+        }
     }
 }
 
@@ -184,7 +212,11 @@ pub struct FontBase {
 }
 
 impl FontBase {
-    fn load_font(path: &str, code: Code) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
+    fn load_font(
+        path: &str,
+        code: Code,
+        args: &Args,
+    ) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
         let font = FontVec::try_from_vec(std::fs::read(path)?)?;
         let styles = Style::from(path);
 
@@ -197,10 +229,12 @@ impl FontBase {
                     if !WHITELIST_SCRIPT.contains(&script)
                         || !WHITELIST_BLOCK.contains(&block)
                         || !WHITELIST_CATEGORY.contains(&category)
+                        || BLACKLIST.contains(&chr)
                     {
                         continue;
                     }
-                    if let Some(glyph) = KnownGlyph::try_from(&font, id, chr, code, size, &styles) {
+                    let data = (id, chr, code, size, &styles);
+                    if let Some(glyph) = KnownGlyph::try_from(&font, data, args) {
                         let key = (glyph.rect.width, glyph.rect.height);
                         glyphs.entry(key).or_insert(Vec::new()).push(glyph);
                     }
@@ -211,25 +245,47 @@ impl FontBase {
         Ok(glyphs)
     }
 
-    fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
+    fn load_family(code: Code, args: &Args) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
         let files = std::fs::read_dir(code.as_path())?;
+        let step = 1. / std::fs::read_dir(code.as_path())?.count() as f32;
+
+        let now = time::Instant::now();
+        let mut progress = 0.;
+
+        std::io::stdout().write_all(b"\x1b[s")?;
+        log(&format!("loading font {code}"), Some(0.), None)?;
 
         let mut family = HashMap::new();
         for file in files {
             let path = file?.path();
-            for (key, glyphs) in FontBase::load_font(&path.to_string_lossy(), code)? {
+            for (key, glyphs) in FontBase::load_font(&path.to_string_lossy(), code, args)? {
                 family.entry(key).or_insert(Vec::new()).extend(glyphs);
             }
+
+            progress += step;
+            log(&format!("loading font {code}"), Some(progress), None)?;
         }
+
+        let duration = now.elapsed().as_secs_f32();
+        log(&format!("loading font {code}"), Some(1.), Some(duration))?;
+        std::io::stdout().write_all(b"\n")?;
 
         Ok(family)
     }
 
-    pub fn new() -> Result<FontBase> {
+    pub fn new(args: &Args) -> Result<FontBase> {
+        let now = time::Instant::now();
+
+        log("LOADING FONTS\n", None, None)?;
+
         let mut glyphs = HashMap::new();
         for code in Code::all() {
-            glyphs.insert(code, FontBase::load_family(code)?);
+            glyphs.insert(code, FontBase::load_family(code, args)?);
         }
+
+        let duration = now.elapsed().as_secs_f32();
+        log(&format!("{} LOADED", Code::count()), None, Some(duration))?;
+        std::io::stdout().write_all(b"\n")?;
 
         Ok(FontBase { glyphs })
     }

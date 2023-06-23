@@ -2,5 +2,8 @@ __pycache__
 python/temp/*
 test.py
 
+test/*
+!test/*.pdf
+
 target
 Cargo.lock

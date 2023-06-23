@@ -1,12 +1,16 @@
+use crate::args::Args;
 use crate::dictionary::Dictionary;
 use crate::font::FontBase;
 use crate::result::Result;
 use crate::text::Line;
-use crate::utils::{find_parts, pdf_to_images, Rect};
+use crate::utils::{find_parts, log, pdf_to_images, Rect};
 use image::imageops::overlay;
 use image::{DynamicImage, Rgba};
+use std::io::Write;
+use std::path::Path;
+use std::time;
 
-const LINE_SPACING: u32 = 5;
+const LINE_SPACING: u32 = 10;
 
 pub struct Page {
     pub image: DynamicImage,
@@ -31,18 +35,50 @@ impl Page {
         }
     }
 
-    pub fn guess(&mut self, fontbase: &FontBase) {
-        std::thread::scope(|scope| {
+    pub fn guess(&mut self, fontbase: &FontBase) -> Result<()> {
+        std::thread::scope(|scope| -> Result<()> {
+            let mut now = time::Instant::now();
+            let mut progress = 0.;
+            let step = 1. / self.lines.len() as f32;
+
+            std::io::stdout().write_all(b"\n\x1b[s")?;
+            log("creating threads", Some(0.), None)?;
+
             let mut handles = Vec::new();
             for line in &mut self.lines {
                 let handle = scope.spawn(move || line.guess(fontbase));
                 handles.push(handle);
+
+                progress += step;
+                log("creating threads", Some(progress), None)?;
             }
+
+            let duration = now.elapsed().as_secs_f32();
+            log("creating threads", Some(1.), Some(duration))?;
+
+            now = time::Instant::now();
+            progress = 0.;
+
+            std::io::stdout().write_all(b"\n\x1b[s")?;
+            log("converting text", Some(0.), None)?;
 
             for handle in handles {
                 handle.join().unwrap();
+
+                progress += step;
+                log("converting text", Some(progress), None)?;
             }
-        });
+
+            let duration = now.elapsed().as_secs_f32();
+            log("converting text", Some(1.), Some(duration))?;
+            std::io::stdout().write_all(b"\n")?;
+
+            let d: f32 = self.lines.iter().map(|l| l.get_dist_sum()).sum();
+            let n: u32 = self.lines.iter().map(|l| l.get_letter_count()).sum();
+            println!("distance moyenne : {}", d / n as f32);
+
+            Ok(())
+        })
     }
 
     pub fn get_content(&self, dictionary: &Dictionary) -> String {
@@ -76,6 +112,15 @@ impl Page {
                         i64::from(line.rect.y + line.rect.height + 1),
                     );
                 }
+                let sub =
+                    image::RgbaImage::from_pixel(word.rect.width, 2, Rgba([255, 100, 100, 255]));
+
+                overlay(
+                    &mut copy,
+                    &sub,
+                    i64::from(word.rect.x),
+                    i64::from(line.rect.y + line.rect.height + 4),
+                );
             }
         }
 
@@ -88,16 +133,17 @@ pub struct Pdf {
 }
 
 impl Pdf {
-    pub fn load(path: &str) -> Result<Pdf> {
+    pub fn load(path: &Path) -> Result<Pdf> {
         let pages = pdf_to_images(path)?.iter().map(Page::from).collect();
 
         Ok(Pdf { pages })
     }
 
-    pub fn guess(&mut self) -> Result<()> {
-        let fontbase = FontBase::new()?;
+    pub fn guess(&mut self, args: &Args) -> Result<()> {
+        let fontbase = FontBase::new(args)?;
+
         for page in &mut self.pages {
-            page.guess(&fontbase);
+            page.guess(&fontbase)?;
         }
 
         Ok(())
@@ -113,5 +159,11 @@ impl Pdf {
         }
 
         Ok(content)
+    }
+
+    pub fn save_content(&self, path: &Path) -> Result<()> {
+        std::fs::write(path, self.get_content()?)?;
+
+        Ok(())
     }
 }
