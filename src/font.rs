@@ -67,7 +67,7 @@ pub enum Code {
     Qcr,
     Qcs,
     Qpl,
-    // Xits,
+    Xits,
 }
 
 impl std::fmt::Display for Code {
@@ -80,7 +80,7 @@ impl std::fmt::Display for Code {
             Code::Qcr => "qcr",
             Code::Qcs => "qcs",
             Code::Qpl => "qpl",
-            // Code::Xits => "xits",
+            Code::Xits => "xits",
         };
         write!(f, "{string}")
     }
@@ -96,7 +96,7 @@ impl Code {
             Code::Qcr,
             Code::Qcs,
             Code::Qpl,
-            // Code::Xits,
+            Code::Xits,
         ]
     }
 
