@@ -35,15 +35,16 @@ impl Page {
         }
     }
 
-    pub fn guess(&mut self, fontbase: &FontBase) -> Result<()> {
+    pub fn guess(&mut self, fontbase: &FontBase, args: &Args) -> Result<()> {
         std::thread::scope(|scope| -> Result<()> {
             let mut now = time::Instant::now();
             let mut progress = 0.;
             let step = 1. / self.lines.len() as f32;
 
-            std::io::stdout().write_all(b"\n\x1b[s")?;
-            std::io::stdout().flush()?;
-            log("creating threads", Some(0.), None)?;
+            if !args.silent {
+                std::io::stdout().write_all(b"\n\x1b[s")?;
+                log("creating threads", Some(0.), None)?;
+            }
 
             let mut handles = Vec::new();
             for line in &mut self.lines {
@@ -51,29 +52,38 @@ impl Page {
                 handles.push(handle);
 
                 progress += step;
-                log("creating threads", Some(progress), None)?;
+                if !args.silent {
+                    log("creating threads", Some(progress), None)?;
+                }
             }
 
             let duration = now.elapsed().as_secs_f32();
-            log("creating threads", Some(1.), Some(duration))?;
+            if !args.silent {
+                log("creating threads", Some(1.), Some(duration))?;
+            }
 
             now = time::Instant::now();
             progress = 0.;
 
-            std::io::stdout().write_all(b"\n\x1b[s")?;
-            std::io::stdout().flush()?;
-            log("converting text", Some(0.), None)?;
+            if !args.silent {
+                std::io::stdout().write_all(b"\n\x1b[s")?;
+                log("converting text", Some(0.), None)?;
+            }
 
             for handle in handles {
                 handle.join().unwrap();
 
                 progress += step;
-                log("converting text", Some(progress), None)?;
+                if !args.silent {
+                    log("converting text", Some(progress), None)?;
+                }
             }
 
             let duration = now.elapsed().as_secs_f32();
-            log("converting text", Some(1.), Some(duration))?;
-            std::io::stdout().write_all(b"\n")?;
+            if !args.silent {
+                log("converting text", Some(1.), Some(duration))?;
+                std::io::stdout().write_all(b"\n")?;
+            }
 
             Ok(())
         })
@@ -89,7 +99,7 @@ impl Page {
         content
     }
 
-    pub fn debug(&self) -> DynamicImage {
+    pub fn debug_image(&self) -> DynamicImage {
         let mut copy = self.image.clone();
         let mut alt = true;
         for line in &self.lines {
@@ -147,8 +157,12 @@ impl Pdf {
     pub fn guess(&mut self, args: &Args) -> Result<()> {
         let fontbase = FontBase::new(args)?;
 
-        for page in &mut self.pages {
-            page.guess(&fontbase)?;
+        for (i, page) in self.pages.iter_mut().enumerate() {
+            if !args.silent {
+                log(&format!("\nPAGE {i}"), None, None)?;
+            }
+
+            page.guess(&fontbase, args)?;
         }
 
         Ok(())

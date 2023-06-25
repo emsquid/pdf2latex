@@ -11,7 +11,11 @@ pub struct Args {
     #[arg(short, long)]
     pub output: Option<PathBuf>,
 
-    /// Font size
+    /// Font size in pt
     #[arg(short, long, default_value_t = 11, value_parser = clap::value_parser!(u32).range(10..=12))]
-    pub size: u32,
+    pub pt: u32,
+
+    /// Silent mode
+    #[arg(short, long, default_value_t = false)]
+    pub silent: bool,
 }

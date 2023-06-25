@@ -91,7 +91,7 @@ impl KnownGlyph {
     ) -> Option<KnownGlyph> {
         let (id, chr, code, size, styles) = data;
         let scale = font
-            .pt_to_px_scale(size.as_pt(args.size) * 512. / 96.)
+            .pt_to_px_scale(size.as_pt(args.pt) * 512. / 96.)
             .unwrap();
         let glyph = id.with_scale(scale);
 
