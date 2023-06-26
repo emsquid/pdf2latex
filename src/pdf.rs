@@ -97,10 +97,10 @@ impl Page {
 
         content
     }
-    pub fn debug_content(&self, dictionary: &Dictionary) -> String {
+    pub fn debug_content(&self) -> String {
         let mut content = String::new();
         for line in &self.lines {
-            content.push_str(&line.debug_content(dictionary));
+            content.push_str(&line.debug_content());
             content.push('\n');
         }
 
@@ -188,11 +188,9 @@ impl Pdf {
         Ok(content)
     }
     pub fn debug_content(&self) -> Result<String> {
-        let dictionary = Dictionary::new()?;
-
         let mut content = String::new();
         for page in &self.pages {
-            content.push_str(&page.debug_content(&dictionary));
+            content.push_str(&page.debug_content());
             content.push('\n');
         }
 

@@ -6,7 +6,7 @@ use ab_glyph::{Font, FontVec, GlyphId};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 use std::collections::HashMap;
 
-pub const DIST_THRESHOLD: f32 = 10.;
+pub const DIST_THRESHOLD: f32 = 0.5;
 pub const CHAR_THRESHOLD: u8 = 50;
 const ASCII_BONUS: f32 = 0.3;
 

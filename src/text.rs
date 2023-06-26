@@ -72,7 +72,7 @@ impl Word {
         average(sizes)
     }
 
-    pub fn get_content(&self, _dictionary: &Dictionary) -> String {
+    pub fn get_content(&self, dictionary: &Dictionary) -> String {
         let mut content = String::new();
         for glyph in &self.glyphs {
             if let Some(guess) = &glyph.guess {
@@ -82,9 +82,9 @@ impl Word {
             }
         }
 
-        content
+        dictionary.correct_guess(&content)
     }
-    pub fn debug_content(&self, _dictionary: &Dictionary) -> String {
+    pub fn debug_content(&self) -> String {
         let mut content = String::new();
         for glyph in &self.glyphs {
             if let Some(guess) = &glyph.guess {
@@ -157,10 +157,10 @@ impl Line {
 
         content.trim_end().to_string()
     }
-    pub fn debug_content(&self, dictionary: &Dictionary) -> String {
+    pub fn debug_content(&self) -> String {
         let mut content = String::new();
         for word in &self.words {
-            content.push_str(&word.debug_content(dictionary));
+            content.push_str(&word.debug_content());
             content.push(' ');
         }
 
