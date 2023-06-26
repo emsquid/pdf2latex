@@ -98,6 +98,15 @@ impl Page {
 
         content
     }
+    pub fn debug_content(&self, dictionary: &Dictionary) -> String {
+        let mut content = String::new();
+        for line in &self.lines {
+            content.push_str(&line.debug_content(dictionary));
+            content.push('\n');
+        }
+
+        content
+    }
 
     pub fn debug_image(&self) -> DynamicImage {
         let mut copy = self.image.clone();
@@ -174,6 +183,17 @@ impl Pdf {
         let mut content = String::new();
         for page in &self.pages {
             content.push_str(&page.get_content(&dictionary));
+            content.push('\n');
+        }
+
+        Ok(content)
+    }
+    pub fn debug_content(&self) -> Result<String> {
+        let dictionary = Dictionary::new()?;
+
+        let mut content = String::new();
+        for page in &self.pages {
+            content.push_str(&page.debug_content(&dictionary));
             content.push('\n');
         }
 

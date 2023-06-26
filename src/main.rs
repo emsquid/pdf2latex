@@ -16,9 +16,12 @@ fn process(args: &args::Args) -> result::Result<()> {
     pdf.guess(args)?;
     match &args.output {
         Some(output) => pdf.save_content(output)?,
-        None => println!("\n{}", pdf.get_content()?),
+        None => println!("\n{}", pdf.debug_content()?),
     }
     pdf.pages[0].debug_dist_avg();
+
+    let l = latex::Latex::from(pdf);
+    l.save("./test/test.tex")?;
 
     Ok(())
 }

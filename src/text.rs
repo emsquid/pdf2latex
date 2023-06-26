@@ -76,6 +76,18 @@ impl Word {
         let mut content = String::new();
         for glyph in &self.glyphs {
             if let Some(guess) = &glyph.guess {
+                content.push(guess.chr);
+            } else {
+                content.push('\u{2584}');
+            }
+        }
+
+        content
+    }
+    pub fn debug_content(&self, _dictionary: &Dictionary) -> String {
+        let mut content = String::new();
+        for glyph in &self.glyphs {
+            if let Some(guess) = &glyph.guess {
                 if !guess.chr.is_ascii() {
                     content.push_str("\x1b[31m");
                 }
@@ -143,7 +155,16 @@ impl Line {
             content.push(' ');
         }
 
-        content
+        content.trim_end().to_string()
+    }
+    pub fn debug_content(&self, dictionary: &Dictionary) -> String {
+        let mut content = String::new();
+        for word in &self.words {
+            content.push_str(&word.debug_content(dictionary));
+            content.push(' ');
+        }
+
+        content.trim_end().to_string()
     }
 
     pub fn get_dist_sum(&self) -> f32 {
