@@ -137,10 +137,15 @@ pub fn average<T: Eq + Hash>(list: Vec<T>) -> T {
     count.into_iter().max_by_key(|&(_, c)| c).unwrap().0
 }
 
-pub fn log(message: &str, progress: Option<f32>, duration: Option<f32>) -> Result<()> {
+pub fn log(
+    message: &str,
+    progress: Option<f32>,
+    duration: Option<f32>,
+    action: &str,
+) -> Result<()> {
     let mut stdout = std::io::stdout();
 
-    stdout.write_all(b"\x1b[u")?;
+    stdout.write_all(format!("\x1b[{action}").as_bytes())?;
     match (progress, duration) {
         (Some(progress), Some(duration)) => {
             let progress = (progress * 20.) as u32;
@@ -160,6 +165,7 @@ pub fn log(message: &str, progress: Option<f32>, duration: Option<f32>) -> Resul
         (None, Some(duration)) => stdout.write_all(format!("{message} in {duration}s").as_bytes()),
         (None, None) => stdout.write_all(message.as_bytes()),
     }?;
+    stdout.write_all(b"\x1b[m")?;
     stdout.flush()?;
 
     Ok(())

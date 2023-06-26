@@ -253,8 +253,7 @@ impl FontBase {
         let mut progress = 0.;
 
         if !args.silent {
-            std::io::stdout().write_all(b"\x1b[s")?;
-            log(&format!("loading font {code}"), Some(0.), None)?;
+            log(&format!("loading font {code}"), Some(0.), None, "s")?;
         }
 
         let mut family = HashMap::new();
@@ -266,13 +265,18 @@ impl FontBase {
 
             progress += step;
             if !args.silent {
-                log(&format!("loading font {code}"), Some(progress), None)?;
+                log(&format!("loading font {code}"), Some(progress), None, "u")?;
             }
         }
 
         let duration = now.elapsed().as_secs_f32();
         if !args.silent {
-            log(&format!("loading font {code}"), Some(1.), Some(duration))?;
+            log(
+                &format!("loading font {code}"),
+                Some(1.),
+                Some(duration),
+                "u",
+            )?;
             std::io::stdout().write_all(b"\n")?;
         }
 
@@ -283,7 +287,7 @@ impl FontBase {
         let now = time::Instant::now();
 
         if !args.silent {
-            log("LOADING FONTS\n", None, None)?;
+            log("LOADING FONTS\n", None, None, "1m")?;
         }
 
         let mut glyphs = HashMap::new();
@@ -293,7 +297,12 @@ impl FontBase {
 
         let duration = now.elapsed().as_secs_f32();
         if !args.silent {
-            log(&format!("{} LOADED", Code::count()), None, Some(duration))?;
+            log(
+                &format!("{} LOADED", Code::count()),
+                None,
+                Some(duration),
+                "1m",
+            )?;
             std::io::stdout().write_all(b"\n")?;
         }
 

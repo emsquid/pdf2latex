@@ -42,8 +42,7 @@ impl Page {
             let step = 1. / self.lines.len() as f32;
 
             if !args.silent {
-                std::io::stdout().write_all(b"\n\x1b[s")?;
-                log("creating threads", Some(0.), None)?;
+                log("creating threads", Some(0.), None, "s")?;
             }
 
             let mut handles = Vec::new();
@@ -53,13 +52,13 @@ impl Page {
 
                 progress += step;
                 if !args.silent {
-                    log("creating threads", Some(progress), None)?;
+                    log("creating threads", Some(progress), None, "u")?;
                 }
             }
 
             let duration = now.elapsed().as_secs_f32();
             if !args.silent {
-                log("creating threads", Some(1.), Some(duration))?;
+                log("creating threads", Some(1.), Some(duration), "u")?;
             }
 
             now = time::Instant::now();
@@ -67,7 +66,7 @@ impl Page {
 
             if !args.silent {
                 std::io::stdout().write_all(b"\n\x1b[s")?;
-                log("converting text", Some(0.), None)?;
+                log("converting text", Some(0.), None, "u")?;
             }
 
             for handle in handles {
@@ -75,13 +74,13 @@ impl Page {
 
                 progress += step;
                 if !args.silent {
-                    log("converting text", Some(progress), None)?;
+                    log("converting text", Some(progress), None, "u")?;
                 }
             }
 
             let duration = now.elapsed().as_secs_f32();
             if !args.silent {
-                log("converting text", Some(1.), Some(duration))?;
+                log("converting text", Some(1.), Some(duration), "u")?;
                 std::io::stdout().write_all(b"\n")?;
             }
 
@@ -168,7 +167,7 @@ impl Pdf {
 
         for (i, page) in self.pages.iter_mut().enumerate() {
             if !args.silent {
-                log(&format!("\nPAGE {i}"), None, None)?;
+                log(&format!("\nPAGE {i}\n"), None, None, "1m")?;
             }
 
             page.guess(&fontbase, args)?;
