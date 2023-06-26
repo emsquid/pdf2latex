@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 pub const DIST_THRESHOLD: f32 = 0.5;
 pub const CHAR_THRESHOLD: u8 = 50;
-const ASCII_BONUS: f32 = 0.15;
+const ASCII_BONUS: f32 = 0.3;
 
 pub trait Glyph {
     fn rect(&self) -> &Rect;
