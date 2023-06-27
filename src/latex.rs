@@ -13,7 +13,6 @@ impl Latex {
 
     pub fn save(&self, path: &str) -> Result<()> {
         let mut file = File::create(path)?;
-        let dictionary = Dictionary::new()?;
         let margin = self
             .pdf
             .pages
@@ -44,15 +43,15 @@ impl Latex {
             for line in &page.lines {
                 content.push_str("\n    ");
 
-                content.push_str(&String::from_iter(
-                    line.get_content(&dictionary).char_indices().map(|c| {
+                content.push_str(&String::from_iter(line.get_content().char_indices().map(
+                    |c| {
                         if c.1.is_ascii() {
                             c.1
                         } else {
                             '?'
                         }
-                    }),
-                ));
+                    },
+                )));
             }
         }
         content.push_str("\n\\end{document}");
