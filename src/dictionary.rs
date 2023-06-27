@@ -28,7 +28,7 @@ impl Dictionary {
         Ok(Dictionary { words })
     }
 
-    fn get_punctuation(&self, word: &str) -> (Vec<char>, Vec<String>) {
+    fn get_punctuation(word: &str) -> (Vec<char>, Vec<String>) {
         let mut splitters: Vec<char> = Vec::new();
         let mut sequences: Vec<String> = Vec::new();
         let mut was_last_ponct: bool = false;
@@ -36,6 +36,13 @@ impl Dictionary {
             if PUNCTUATION.contains(&chr.category()) {
                 if was_last_ponct {
                     sequences.last_mut().unwrap().push(chr);
+                    let length = sequences.last().unwrap().chars().count();
+                    let last_two = sequences.last().unwrap().get(length-2..).unwrap();
+                    if last_two == &String::from("‘‘") || last_two == &String::from("’’"){
+                        let mut modified = String::from(sequences.last().unwrap().get(..length-2).unwrap());
+                        modified.push('\"');
+                        *sequences.last_mut().unwrap() = modified;
+                    }
                 } else {
                     sequences.push(chr.to_string());
                 }
@@ -45,11 +52,26 @@ impl Dictionary {
                 was_last_ponct = false;
             }
         }
-
         (splitters, sequences)
     }
 
+    fn asc2ification(guess: &str) -> String {
+        let mut new = String::new();
+        for chr in guess.chars(){
+            match chr {
+                'ﬁ' => new.push_str("fi"),
+                'ﬂ' => new.push_str("fl"),
+                'ﬀ' => new.push_str("ff"),
+                'ﬄ' => new.push_str("ffl"),
+                'ﬃ' => new.push_str("ffi"),
+                _ => new.push(chr),
+            }
+        }
+        new
+    }
+
     fn correct_word(&self, guess: &str) -> String {
+        let guess = Dictionary::asc2ification(guess);
         let mut best_match: String = String::new();
         if guess.chars().all(|chr| chr.is_ascii_alphabetic()) {
             let mut best_dist: f64 = 0.;
@@ -73,13 +95,13 @@ impl Dictionary {
             })
             .collect()
         } else {
-            guess.to_string()
+            guess
         }
     }
 
     pub fn correct_guess(&self, guess: &str) -> String {
         let mut corrected: String = String::new();
-        let (splitters, mut punct) = self.get_punctuation(guess);
+        let (splitters, mut punct) = Dictionary::get_punctuation(guess);
 
         let mut words: Vec<&str> = guess.split(splitters.as_slice()).collect();
         words.retain(|part| !part.is_empty());

@@ -148,10 +148,10 @@ impl Line {
         }
     }
 
-    pub fn get_content(&self, dictionary: &Dictionary) -> String {
+    pub fn get_content(&self) -> String {
         self.words
             .iter()
-            .map(|word| dictionary.correct_guess(&word.get_content()))
+            .map(|word| word.get_content())
             .collect::<Vec<String>>()
             .join(" ")
     }

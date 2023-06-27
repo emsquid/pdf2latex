@@ -89,13 +89,14 @@ impl Page {
         })
     }
 
-    pub fn get_content(&self, dictionary: &Dictionary) -> String {
+    pub fn get_content(&self) -> String {
         self.lines
             .iter()
-            .map(|line| line.get_content(dictionary))
+            .map(|line| line.get_content())
             .collect::<Vec<String>>()
             .join("\n")
     }
+
     pub fn debug_content(&self) -> String {
         self.lines
             .iter()
@@ -175,13 +176,14 @@ impl Pdf {
 
     pub fn get_content(&self) -> Result<String> {
         let dictionary = Dictionary::new()?;
-
-        Ok(self
+        let content = self
             .pages
             .iter()
-            .map(|page| page.get_content(&dictionary))
+            .map(|page| page.get_content())
             .collect::<Vec<String>>()
-            .join("\n"))
+            .join("\n");
+
+        Ok(dictionary.correct_guess(&content))
     }
 
     pub fn debug_content(&self) -> Result<String> {
