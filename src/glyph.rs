@@ -146,7 +146,7 @@ impl UnknownGlyph {
         let x = base_pixels.iter().map(|(x, _)| *x).min().unwrap();
         let width = base_pixels.iter().map(|(px, _)| px - x + 1).max().unwrap();
 
-        Rect::new(bounds.x + x - 7, bounds.y, width + 14, bounds.height)
+        Rect::new(bounds.x + x - 5, bounds.y, width + 10, bounds.height)
     }
 
     fn find_pixels(base: Rect, image: &DynamicImage) -> Vec<(u32, u32)> {

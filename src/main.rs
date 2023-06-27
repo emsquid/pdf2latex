@@ -20,8 +20,8 @@ fn process(args: &args::Args) -> result::Result<()> {
     }
     pdf.pages[0].debug_dist_avg();
 
-    let l = latex::Latex::from(pdf);
-    l.save("./test/test.tex")?;
+    let latex = latex::Latex::from(pdf);
+    latex.save("test/test.tex")?;
 
     Ok(())
 }

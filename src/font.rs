@@ -1,7 +1,7 @@
-use crate::args::Args;
 use crate::glyph::KnownGlyph;
 use crate::result::Result;
 use crate::utils::log;
+use crate::{args::Args, glyph::Glyph};
 use ab_glyph::{Font, FontVec};
 use std::collections::HashMap;
 use std::io::Write;
@@ -187,6 +187,12 @@ pub enum Style {
     Italic,
     Slanted,
     // Underlined,
+    SansSerif,
+    BlackBoard,
+    Calligraphic,
+    Fraktur,
+    SmallCaps,
+    TypeWriter,
 }
 
 impl Style {
@@ -201,6 +207,24 @@ impl Style {
         }
         if path.contains("slant") {
             styles.push(Style::Slanted);
+        }
+        if path.contains("sansserif") {
+            styles.push(Style::SansSerif);
+        }
+        if path.contains("blackboard") {
+            styles.push(Style::BlackBoard);
+        }
+        if path.contains("calligraphic") {
+            styles.push(Style::Calligraphic);
+        }
+        if path.contains("fraktur") {
+            styles.push(Style::Fraktur);
+        }
+        if path.contains("smallcaps") {
+            styles.push(Style::SmallCaps);
+        }
+        if path.contains("typewriter") {
+            styles.push(Style::TypeWriter);
         }
 
         styles

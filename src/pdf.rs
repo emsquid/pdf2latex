@@ -1,6 +1,7 @@
 use crate::args::Args;
 use crate::dictionary::Dictionary;
 use crate::font::FontBase;
+use crate::glyph::Glyph;
 use crate::result::Result;
 use crate::text::Line;
 use crate::utils::{find_parts, log, pdf_to_images, Rect};
@@ -89,22 +90,18 @@ impl Page {
     }
 
     pub fn get_content(&self, dictionary: &Dictionary) -> String {
-        let mut content = String::new();
-        for line in &self.lines {
-            content.push_str(&line.get_content(dictionary));
-            content.push('\n');
-        }
-
-        content
+        self.lines
+            .iter()
+            .map(|line| line.get_content(dictionary))
+            .collect::<Vec<String>>()
+            .join("\n")
     }
     pub fn debug_content(&self) -> String {
-        let mut content = String::new();
-        for line in &self.lines {
-            content.push_str(&line.debug_content());
-            content.push('\n');
-        }
-
-        content
+        self.lines
+            .iter()
+            .map(|line| line.debug_content())
+            .collect::<Vec<String>>()
+            .join("\n")
     }
 
     pub fn debug_image(&self) -> DynamicImage {
@@ -179,22 +176,34 @@ impl Pdf {
     pub fn get_content(&self) -> Result<String> {
         let dictionary = Dictionary::new()?;
 
-        let mut content = String::new();
-        for page in &self.pages {
-            content.push_str(&page.get_content(&dictionary));
-            content.push('\n');
-        }
-
-        Ok(content)
+        Ok(self
+            .pages
+            .iter()
+            .map(|page| page.get_content(&dictionary))
+            .collect::<Vec<String>>()
+            .join("\n"))
     }
+
     pub fn debug_content(&self) -> Result<String> {
-        let mut content = String::new();
-        for page in &self.pages {
-            content.push_str(&page.debug_content());
-            content.push('\n');
+        for (p, page) in self.pages.iter().enumerate() {
+            for (l, line) in page.lines.iter().enumerate() {
+                for (w, word) in line.words.iter().enumerate() {
+                    for (g, glyph) in word.glyphs.iter().enumerate() {
+                        if let Some(guess) = &glyph.guess {
+                            glyph.save(&format!("test/debug_{p}_{l}_{w}_{g}_o.png"))?;
+                            guess.save(&format!("test/debug_{p}_{l}_{w}_{g}_g.png"))?;
+                        }
+                    }
+                }
+            }
         }
 
-        Ok(content)
+        Ok(self
+            .pages
+            .iter()
+            .map(|page| page.debug_content())
+            .collect::<Vec<String>>()
+            .join("\n"))
     }
 
     pub fn save_content(&self, path: &Path) -> Result<()> {
