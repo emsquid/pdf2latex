@@ -88,10 +88,10 @@ impl Page {
         })
     }
 
-    pub fn get_content(&self, dictionary: &Dictionary) -> String {
+    pub fn get_content(&self) -> String {
         let mut content = String::new();
         for line in &self.lines {
-            content.push_str(&line.get_content(dictionary));
+            content.push_str(&line.get_content());
             content.push('\n');
         }
 
@@ -181,11 +181,11 @@ impl Pdf {
 
         let mut content = String::new();
         for page in &self.pages {
-            content.push_str(&page.get_content(&dictionary));
+            content.push_str(&page.get_content());
             content.push('\n');
         }
 
-        Ok(content)
+        Ok(dictionary.correct_guess(&content))
     }
     pub fn debug_content(&self) -> Result<String> {
         let mut content = String::new();
