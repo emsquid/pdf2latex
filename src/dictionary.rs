@@ -36,6 +36,13 @@ impl Dictionary {
             if PUNCTUATION.contains(&chr.category()) {
                 if was_last_ponct {
                     sequences.last_mut().unwrap().push(chr);
+                    let length = sequences.last().unwrap().chars().count();
+                    let last_two = sequences.last().unwrap().get(length-2..).unwrap();
+                    if last_two == &String::from("‘‘") || last_two == &String::from("’’"){
+                        let mut modified = String::from(sequences.last().unwrap().get(..length-2).unwrap());
+                        modified.push('\"');
+                        *sequences.last_mut().unwrap() = modified;
+                    }
                 } else {
                     sequences.push(chr.to_string());
                 }
@@ -45,7 +52,6 @@ impl Dictionary {
                 was_last_ponct = false;
             }
         }
-
         (splitters, sequences)
     }
 
