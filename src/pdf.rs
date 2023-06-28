@@ -1,14 +1,16 @@
 use crate::args::Args;
 use crate::dictionary::Dictionary;
 use crate::font::FontBase;
+use crate::glyph::Glyph;
 use crate::result::Result;
 use crate::text::Line;
 use crate::utils::{find_parts, log, pdf_to_images, Rect};
 use image::imageops::overlay;
-use image::{DynamicImage, Rgba};
+use image::{DynamicImage, Rgba, GenericImage};
+use std::collections::btree_map::Iter;
 use std::io::Write;
 use std::path::Path;
-use std::time;
+use std::{time, default};
 
 const LINE_SPACING: u32 = 10;
 
@@ -109,23 +111,65 @@ impl Page {
 
     pub fn debug_image(&self) -> DynamicImage {
         let mut copy = self.image.clone();
-        let mut alt = true;
+        let mut alt = 0;
         for line in &self.lines {
+            let sub =
+                image::RgbaImage::from_pixel(line.rect.width, 1, Rgba([255, 0, 255, 255]));
+
+            overlay(
+                &mut copy,
+                &sub,
+                i64::from(line.rect.x),
+                i64::from(line.baseline),
+            );
+            
             for word in &line.words {
                 for glyph in &word.glyphs {
-                    alt = !alt;
-                    let color = if alt {
-                        Rgba([0, 0, 255, 255])
-                    } else {
-                        Rgba([0, 255, 0, 255])
+                    alt = (alt + 1) % 4;
+                    let color = match alt {
+                        0 => Rgba([255, 0, 0, 255]),
+                        1 => Rgba([0, 255, 0, 255]),
+                        2 => Rgba([0, 0, 255, 255]),
+                        3 => Rgba([255, 255, 0, 255]),
+                        _ => Rgba([0, 255, 255, 255])
                     };
                     let sub = image::RgbaImage::from_pixel(glyph.rect.width, 2, color);
+                    
+                    // for x in 0..glyph.rect.width {
+                    // for y in 0..glyph.rect.height {
+                    //     if glyph.get_pixel(x, y) < 1. {
+                    //         let v = (255. * glyph.get_pixel(x, y)) as u8;
+                    //         let c = match alt {
+                    //             0 => Rgba([255, v, v, 255]),
+                    //             1 => Rgba([v, 255, v, 255]),
+                    //             2 => Rgba([v, v, 255, 255]),
+                    //             3 => Rgba([255, 255, v, 255]),
+                    //             _ => Rgba([v, 255, 255, 255])
+                    //         };
+                    //         copy.put_pixel(glyph.rect.x + x, glyph.rect.y + y, c)
+                    //     }
+                    // }}
+                    let guess = glyph.guess.as_ref().unwrap();
+                    for x in 0..guess.rect.width {
+                    for y in 0..guess.rect.height {
+                        if guess.get_pixel(x, y) < 0.9 {
+                            let v = (255. * guess.get_pixel(x, y)) as u8;
+                            let c = match alt {
+                                0 => Rgba([255, v, v, 255]),
+                                1 => Rgba([v, 255, v, 255]),
+                                2 => Rgba([v, v, 255, 255]),
+                                3 => Rgba([255, 255, v, 255]),
+                                _ => Rgba([v, 255, 255, 255])
+                            };
+                            copy.put_pixel(glyph.rect.x + x, (line.baseline + y).saturating_add_signed(guess.baseline_offset), c)
+                        }
+                    }}
 
                     overlay(
                         &mut copy,
                         &sub,
                         i64::from(glyph.rect.x),
-                        i64::from(line.rect.y + line.rect.height + 1),
+                        i64::from(line.rect.y + line.rect.height + 2),
                     );
                 }
                 let sub =
