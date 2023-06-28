@@ -22,8 +22,8 @@ fn process(args: &args::Args) -> result::Result<()> {
     pdf.pages[0].debug_dist_avg();
     pdf.pages[0].debug_image().save("./test/debug.png")?;
 
-    // let l = latex::Latex::from(pdf);
-    // l.save("./test/test.tex")?;
+    // let latex = latex::Latex::from(pdf);
+    // latex.save("test/test.tex")?;
 
     Ok(())
 }

@@ -132,43 +132,43 @@ impl Word {
         average(sizes)
     }
 
-    pub fn get_content(&self, _dictionary: &Dictionary) -> String {
-        let mut content = String::new();
-        for glyph in &self.glyphs {
-            if let Some(guess) = &glyph.guess {
-                content.push(guess.chr);
-            } else {
-                content.push('\u{2584}');
-            }
-        }
-
-        content
+    pub fn get_content(&self) -> String {
+        self.glyphs
+            .iter()
+            .map(|glyph| match &glyph.guess {
+                Some(guess) => guess.chr,
+                None => '\u{2584}',
+            })
+            .collect()
     }
-    pub fn debug_content(&self, _dictionary: &Dictionary) -> String {
-        let mut content = String::new();
-        for glyph in &self.glyphs {
-            if let Some(guess) = &glyph.guess {
-                if !guess.chr.is_ascii() {
-                    content.push_str("\x1b[31m");
-                }
-                if guess.styles.contains(&Style::Bold) {
-                    content.push_str("\x1b[1;32m");
-                }
-                if guess.styles.contains(&Style::Italic) {
-                    content.push_str("\x1b[3;34m");
-                }
-                if guess.styles.contains(&Style::Slanted) {
-                    content.push_str("\x1b[3;35m");
-                }
-                content.push(guess.chr);
-            } else {
-                content.push_str("\x1b[33m");
-                content.push('\u{2584}');
-            }
-            content.push_str("\x1b[0m");
-        }
 
-        content
+    pub fn debug_content(&self) -> String {
+        self.glyphs
+            .iter()
+            .map(|glyph| {
+                let mut content = String::new();
+                if let Some(guess) = &glyph.guess {
+                    if !guess.chr.is_ascii() {
+                        content.push_str("\x1b[31m");
+                    }
+                    if guess.styles.contains(&Style::Bold) {
+                        content.push_str("\x1b[1;32m");
+                    }
+                    if guess.styles.contains(&Style::Italic) {
+                        content.push_str("\x1b[3;34m");
+                    }
+                    if guess.styles.contains(&Style::Slanted) {
+                        content.push_str("\x1b[3;35m");
+                    }
+                    content.push(guess.chr);
+                } else {
+                    content.push_str("\x1b[33m");
+                    content.push('\u{2584}');
+                }
+                content.push_str("\x1b[0m");
+                content
+            })
+            .collect()
     }
 
     pub fn get_dist_sum(&self) -> f32 {
@@ -232,23 +232,20 @@ impl Line {
         }
     }
 
-    pub fn get_content(&self, dictionary: &Dictionary) -> String {
-        let mut content = String::new();
-        for word in &self.words {
-            content.push_str(&word.get_content(dictionary));
-            content.push(' ');
-        }
-
-        content.trim_end().to_string()
+    pub fn get_content(&self) -> String {
+        self.words
+            .iter()
+            .map(|word| word.get_content())
+            .collect::<Vec<String>>()
+            .join(" ")
     }
-    pub fn debug_content(&self, dictionary: &Dictionary) -> String {
-        let mut content = String::new();
-        for word in &self.words {
-            content.push_str(&word.debug_content(dictionary));
-            content.push(' ');
-        }
 
-        content.trim_end().to_string()
+    pub fn debug_content(&self) -> String {
+        self.words
+            .iter()
+            .map(|word| word.debug_content())
+            .collect::<Vec<String>>()
+            .join(" ")
     }
 
     pub fn get_dist_sum(&self) -> f32 {

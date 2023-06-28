@@ -90,23 +90,20 @@ impl Page {
         })
     }
 
-    pub fn get_content(&self, dictionary: &Dictionary) -> String {
-        let mut content = String::new();
-        for line in &self.lines {
-            content.push_str(&line.get_content(dictionary));
-            content.push('\n');
-        }
-
-        content
+    pub fn get_content(&self) -> String {
+        self.lines
+            .iter()
+            .map(|line| line.get_content())
+            .collect::<Vec<String>>()
+            .join("\n")
     }
-    pub fn debug_content(&self, dictionary: &Dictionary) -> String {
-        let mut content = String::new();
-        for line in &self.lines {
-            content.push_str(&line.debug_content(dictionary));
-            content.push('\n');
-        }
 
-        content
+    pub fn debug_content(&self) -> String {
+        self.lines
+            .iter()
+            .map(|line| line.debug_content())
+            .collect::<Vec<String>>()
+            .join("\n")
     }
 
     pub fn debug_image(&self) -> DynamicImage {
@@ -222,25 +219,36 @@ impl Pdf {
 
     pub fn get_content(&self) -> Result<String> {
         let dictionary = Dictionary::new()?;
+        let content = self
+            .pages
+            .iter()
+            .map(|page| page.get_content())
+            .collect::<Vec<String>>()
+            .join("\n");
 
-        let mut content = String::new();
-        for page in &self.pages {
-            content.push_str(&page.get_content(&dictionary));
-            content.push('\n');
-        }
-
-        Ok(content)
+        Ok(dictionary.correct_text(content))
     }
-    pub fn debug_content(&self) -> Result<String> {
-        let dictionary = Dictionary::new()?;
 
-        let mut content = String::new();
-        for page in &self.pages {
-            content.push_str(&page.debug_content(&dictionary));
-            content.push('\n');
+    pub fn debug_content(&self) -> Result<String> {
+        for (p, page) in self.pages.iter().enumerate() {
+            for (l, line) in page.lines.iter().enumerate() {
+                for (w, word) in line.words.iter().enumerate() {
+                    for (g, glyph) in word.glyphs.iter().enumerate() {
+                        if let Some(guess) = &glyph.guess {
+                            glyph.save(&format!("test/debug_{p}_{l}_{w}_{g}_o.png"))?;
+                            guess.save(&format!("test/debug_{p}_{l}_{w}_{g}_g.png"))?;
+                        }
+                    }
+                }
+            }
         }
 
-        Ok(content)
+        Ok(self
+            .pages
+            .iter()
+            .map(|page| page.debug_content())
+            .collect::<Vec<String>>()
+            .join("\n"))
     }
 
     pub fn save_content(&self, path: &Path) -> Result<()> {
