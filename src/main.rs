@@ -14,7 +14,6 @@ fn process(args: &args::Args) -> result::Result<()> {
     let mut pdf = pdf::Pdf::load(&args.input)?;
 
     pdf.guess(args)?;
-    println!("{}", pdf.pages[0].lines[0].words[2].glyphs[1].guess.as_ref().unwrap().code.to_string());
     match &args.output {
         Some(output) => pdf.save_content(output)?,
         None => println!("\n{}", pdf.debug_content()?),
