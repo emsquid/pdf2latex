@@ -19,12 +19,7 @@ pub struct Dictionary {
 impl Dictionary {
     pub fn new() -> Result<Dictionary> {
         let file = std::fs::read_to_string("words.txt")?;
-        let mut words = file
-            .split(['\r', '\n'])
-            .map(String::from)
-            .collect::<Vec<String>>();
-        words.retain(|word| !word.is_empty());
-
+        let words = file.lines().map(String::from).collect();
         Ok(Dictionary { words })
     }
 
@@ -36,13 +31,6 @@ impl Dictionary {
             if PUNCTUATION.contains(&chr.category()) {
                 if was_last_ponct {
                     sequences.last_mut().unwrap().push(chr);
-                    let length = sequences.last().unwrap().chars().count();
-                    let last_two = sequences.last().unwrap().get(length-2..).unwrap();
-                    if last_two == &String::from("‘‘") || last_two == &String::from("’’"){
-                        let mut modified = String::from(sequences.last().unwrap().get(..length-2).unwrap());
-                        modified.push('\"');
-                        *sequences.last_mut().unwrap() = modified;
-                    }
                 } else {
                     sequences.push(chr.to_string());
                 }
@@ -57,7 +45,7 @@ impl Dictionary {
 
     fn asc2ification(guess: &str) -> String {
         let mut new = String::new();
-        for chr in guess.chars(){
+        for chr in guess.chars() {
             match chr {
                 'ﬁ' => new.push_str("fi"),
                 'ﬂ' => new.push_str("fl"),
@@ -99,15 +87,15 @@ impl Dictionary {
         }
     }
 
-    pub fn correct_guess(&self, guess: &str) -> String {
+    pub fn correct_string(&self, string: &str) -> String {
         let mut corrected: String = String::new();
-        let (splitters, mut punct) = Dictionary::get_punctuation(guess);
+        let (splitters, mut punct) = Dictionary::get_punctuation(string);
 
-        let mut words: Vec<&str> = guess.split(splitters.as_slice()).collect();
+        let mut words: Vec<&str> = string.split(splitters.as_slice()).collect();
         words.retain(|part| !part.is_empty());
 
         let mut is_punct_turn: bool =
-            PUNCTUATION.contains(&guess.chars().next().unwrap().category());
+            PUNCTUATION.contains(&string.chars().next().unwrap().category());
 
         while !words.is_empty() || !punct.is_empty() {
             if words.is_empty() {
@@ -124,5 +112,49 @@ impl Dictionary {
             }
         }
         corrected
+    }
+
+    fn correct_line(&self, line: &String) -> String {
+        let mut strings: Vec<String> = line.split(' ').map(String::from).collect();
+        strings.retain(|part| !part.is_empty());
+
+        for string in &strings {
+            self.correct_string(&string);
+        }
+
+        strings.join(" ")
+    }
+
+    pub fn correct_text(&self, mut text: String) -> String {
+        text = text
+            .replace("‘‘", "\"")
+            .replace("’’", "\"")
+            .replace("·,", ";");
+        let mut lines: Vec<String> = text.lines().map(String::from).collect();
+        let mut cross_lines: Vec<bool> = Vec::new();
+        for i in 0..lines.len() {
+            if lines[i].ends_with('-') && lines.last().unwrap() != &lines[i] {
+                while !lines[i + 1].starts_with(" ") {
+                    let chr = lines[i + 1].remove(0);
+                    lines[i].push(chr);
+                }
+                self.correct_line(&lines[i]);
+                cross_lines.push(true);
+            } else {
+                self.correct_line(&lines[i]);
+                cross_lines.push(false);
+            }
+        }
+
+        for k in 0..lines.len() {
+            if cross_lines[k] {
+                while !lines[k].ends_with("-") {
+                    let chr = lines[k].pop().unwrap();
+                    lines[k+1].insert(0, chr);
+                }
+            }
+        }
+
+        lines.join("\n")
     }
 }
