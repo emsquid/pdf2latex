@@ -27,6 +27,10 @@ impl Rect {
     pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
         image.crop_imm(self.x, self.y, self.width, self.height)
     }
+
+    pub fn center(&self) -> (u32, u32) {
+        (self.x + self.width / 2, self.y + self.height / 2)
+    }
 }
 
 fn split(buffer: &[u8], delimiter: u8) -> Vec<&[u8]> {

@@ -56,7 +56,7 @@ const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
     UnicodeCategory::UppercaseLetter,
 ];
 
-const BLACKLIST: &[char] = &['·'];
+const BLACKLIST: &[char] = &['·'];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Code {
@@ -94,7 +94,7 @@ impl Code {
             Code::Put,
             Code::Qag,
             Code::Qcr,
-            Code::Qcs,
+            // Code::Qcs,
             Code::Qpl,
             Code::Xits,
         ]

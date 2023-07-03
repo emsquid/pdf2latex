@@ -19,9 +19,10 @@ fn process(args: &args::Args) -> result::Result<()> {
         None => println!("\n{}", pdf.get_content()?),
     }
     pdf.pages[0].debug_dist_avg();
+    pdf.pages[0].debug_image().save("./test/debug.png")?;
 
-    let latex = latex::Latex::from(pdf);
-    latex.save("test/test.tex")?;
+    // let latex = latex::Latex::from(pdf);
+    // latex.save("test/test.tex")?;
 
     Ok(())
 }
