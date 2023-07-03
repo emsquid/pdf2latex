@@ -183,7 +183,8 @@ impl Pdf {
             .collect::<Vec<String>>()
             .join("\n");
 
-        Ok(dictionary.correct_text(content))
+        //Ok(dictionary.correct_text(content)
+        Ok(content)
     }
 
     pub fn debug_content(&self) -> Result<String> {
