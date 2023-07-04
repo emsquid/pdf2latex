@@ -6,8 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Command;
 
-pub const DIST_THRESHOLD: f32 = 0.5;
-pub const CHAR_THRESHOLD: u8 = 50;
+pub const DIST_UNALIGNED_THRESHOLD: f32 = 32.;
+pub const DIST_THRESHOLD: f32 = 10.;
+pub const CHAR_THRESHOLD: u8 = 75;
 const ASCII_BONUS: f32 = 0.3;
 
 pub trait Glyph {
@@ -22,24 +23,47 @@ pub trait Glyph {
         }
     }
 
-    fn distance(&self, other: &dyn Glyph, limit: f32) -> f32 {
-        let mut dist = HashMap::new();
+    fn get_pixel_signed(&self, x: i32, y: i32) -> f32 {
+        if x < 0 || y < 0 || x >= self.rect().width as i32 || y >= self.rect().height as i32 {
+            1.
+        } else {
+            f32::from(
+                self.image()[(x.unsigned_abs() + y.unsigned_abs() * self.rect().width) as usize],
+            ) / 255.
+        }
+    }
+
+    fn distance(&self, other: &dyn Glyph, offset: i32, limit: f32) -> f32 {
+        let mut dist: HashMap<(i32, i32), f32> = HashMap::new();
         for dx in -1..=1 {
             for dy in -1..=1 {
-                dist.insert((dx, dy), 0.);
+                dist.insert((dx, dy + offset), 0.);
             }
         }
 
-        let width = u32::max(self.rect().width, other.rect().width);
-        let height = u32::max(self.rect().height, other.rect().height);
-        for x in 0..width {
-            for y in 0..height {
+        for x in 0..self.rect().width {
+            for y in 0..self.rect().height {
                 for (&(dx, dy), value) in &mut dist {
                     if *value < limit {
                         let v_g = self.get_pixel(x, y);
-                        let v_o =
-                            other.get_pixel(x.wrapping_add_signed(dx), y.wrapping_add_signed(dy));
-                        *value += (v_g - v_o).powf(2.);
+                        if v_g != 1. {
+                            let v_o = other.get_pixel_signed(x as i32 + dx, y as i32 + dy);
+                            *value += (v_g - v_o).powf(2.);
+                        }
+                    }
+                }
+            }
+        }
+        for x in 0..other.rect().width {
+            for y in 0..other.rect().height {
+                for (&(dx, dy), value) in &mut dist {
+                    if *value < limit {
+                        let v_g = self.get_pixel_signed(x as i32 - dx, y as i32 - dy);
+                        if v_g == 1. {
+                            let v_o = other
+                                .get_pixel(x.wrapping_add_signed(dx), y.wrapping_add_signed(dy));
+                            *value += (v_g - v_o).powf(2.);
+                        }
                     }
                 }
             }
@@ -205,44 +229,8 @@ impl Glyph for UnknownGlyph {
 }
 
 impl UnknownGlyph {
-    fn find_rect(start: (u32, u32), bounds: Rect, image: &DynamicImage) -> Rect {
-        let base_pixels = flood_fill(vec![start], &bounds.crop(image).to_luma8(), CHAR_THRESHOLD);
-
-        let x = base_pixels.iter().map(|(x, _)| *x).min().unwrap();
-        let width = base_pixels.iter().map(|(px, _)| px - x + 1).max().unwrap();
-
-        Rect::new(bounds.x + x - 5, bounds.y, width + 10, bounds.height)
-    }
-
-    fn find_pixels(base: Rect, image: &DynamicImage) -> Vec<(u32, u32)> {
-        let gray = base.crop(image).to_luma8();
-
-        let mut borders = Vec::new();
-        for x in [0, base.width - 1] {
-            for y in 0..base.height {
-                if gray[(x, y)].0[0] < 255 {
-                    borders.push((x, y));
-                }
-            }
-        }
-
-        let unwanted_pixels = flood_fill(borders, &gray, CHAR_THRESHOLD);
-
-        let mut pixels = Vec::new();
-        for x in 0..base.width {
-            for y in 0..base.height {
-                if gray[(x, y)].0[0] < 255 && !unwanted_pixels.contains(&(x, y)) {
-                    pixels.push((base.x + x, base.y + y));
-                }
-            }
-        }
-
-        pixels
-    }
-
     pub fn from(start: (u32, u32), bounds: Rect, image: &DynamicImage) -> UnknownGlyph {
-        let base = UnknownGlyph::find_rect(start, bounds, image);
-        let pixels = UnknownGlyph::find_pixels(base, image);
+        let pixels = flood_fill(vec![start], &bounds.crop(image).to_luma8(), CHAR_THRESHOLD);
 
         let x = pixels.iter().map(|(x, _)| *x).min().unwrap();
         let y = pixels.iter().map(|(_, y)| *y).min().unwrap();
@@ -251,8 +239,45 @@ impl UnknownGlyph {
 
         let mut glyph_image = RgbImage::from_pixel(width, height, Rgb([255, 255, 255]));
         for (px, py) in &pixels {
-            let color = image.get_pixel(*px, *py).to_rgb();
+            let color = image.get_pixel(*px + bounds.x, *py + bounds.y).to_rgb();
             glyph_image.put_pixel(px - x, py - y, color);
+        }
+
+        UnknownGlyph {
+            rect: Rect::new(x + bounds.x, y + bounds.y, width, height),
+            image: DynamicImage::ImageRgb8(glyph_image).to_luma8().into_raw(),
+            dist: None,
+            guess: None,
+        }
+    }
+
+    pub fn join(&self, other: &UnknownGlyph) -> UnknownGlyph {
+        let x = self.rect.x.min(other.rect.x);
+        let y = self.rect.y.min(other.rect.y);
+        let width = (self.rect.x + self.rect.width - x).max(other.rect.x + other.rect.width - x);
+        let height = (self.rect.y + self.rect.height - y).max(other.rect.y + other.rect.height - y);
+
+        let mut glyph_image = RgbImage::from_pixel(width, height, Rgb([255, 255, 255]));
+        for dx in 0..self.rect.width {
+            for dy in 0..self.rect.height {
+                let v = self.image[(dx + dy * self.rect.width) as usize];
+                glyph_image.put_pixel(
+                    dx + (self.rect.x - x),
+                    dy + (self.rect.y - y),
+                    Rgb([v, v, v]),
+                );
+            }
+        }
+
+        for _x in 0..other.rect.width {
+            for _y in 0..other.rect.height {
+                let v = other.image[(_x + _y * other.rect.width) as usize];
+                glyph_image.put_pixel(
+                    _x + (other.rect.x - x),
+                    _y + (other.rect.y - y),
+                    Rgb([v, v, v]),
+                );
+            }
         }
 
         UnknownGlyph {
@@ -265,9 +290,11 @@ impl UnknownGlyph {
 
     pub fn try_guess(
         &mut self,
+        baseline: u32,
         fontbase: &FontBase,
         word_length: usize,
         hint: Option<(Code, Size)>,
+        is_aligned: bool,
     ) {
         let bonus = |base: &String| {
             if base.len() == 1 && base.is_ascii() && word_length > 1 {
@@ -294,9 +321,12 @@ impl UnknownGlyph {
                                 continue;
                             }
 
-                            let dist = self.distance(glyph, closest / (1. - ASCII_BONUS))
-                                * bonus(&glyph.base);
-
+                            let offset = glyph.offset - ((self.rect.y) as i32 - baseline as i32);
+                            let dist = self.distance(
+                                glyph,
+                                is_aligned.then_some(offset).unwrap_or(0),
+                                closest / (1. - ASCII_BONUS),
+                            ) * bonus(&glyph.base);
                             if dist < closest {
                                 closest = dist;
                                 self.dist = Some(dist);
@@ -313,3 +343,4 @@ impl UnknownGlyph {
         }
     }
 }
+

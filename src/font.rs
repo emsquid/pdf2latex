@@ -89,7 +89,7 @@ impl Code {
             Code::Put,
             Code::Qag,
             Code::Qcr,
-            Code::Qcs,
+            // Code::Qcs,
             Code::Qpl,
         ]
     }

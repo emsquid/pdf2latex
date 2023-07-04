@@ -1,7 +1,12 @@
 use crate::font::{Code, FontBase, Size, Style};
 use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
+use std::ops::AddAssign;
+use std::process::exit;
+
+use crate::glyph::{Glyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
+use std::collections::HashMap;
 
 const WORD_SPACING: u32 = 15;
 
@@ -12,17 +17,28 @@ pub struct Word {
 
 impl Word {
     fn find_glyphs(bounds: Rect, image: &DynamicImage) -> Vec<UnknownGlyph> {
-        let gray = bounds.crop(image).to_luma8();
+        let mut gray = bounds.crop(image).to_luma8();
 
         let mut glyphs = Vec::new();
         let mut x = 0;
-        'outer: while x < gray.width() {
+        while x < gray.width() {
             for y in 0..gray.height() {
                 if gray[(x, y)].0[0] <= CHAR_THRESHOLD {
                     let glyph = UnknownGlyph::from((x, y), bounds, image);
-                    x = glyph.rect.x - bounds.x + glyph.rect.width;
+
+                    for _x in 0..glyph.rect.width {
+                        for _y in 0..glyph.rect.height {
+                            if glyph.get_pixel(_x, _y) < 1. {
+                                gray.put_pixel(
+                                    _x + glyph.rect.x - bounds.x,
+                                    _y + glyph.rect.y - bounds.y,
+                                    image::Luma([255]),
+                                )
+                            }
+                        }
+                    }
+                    // gray.save(format!("./test/debug{}.png", glyphs.len())).unwrap();
                     glyphs.push(glyph);
-                    continue 'outer;
                 }
             }
             x += 1;
@@ -38,17 +54,79 @@ impl Word {
         }
     }
 
-    pub fn guess(&mut self, fontbase: &FontBase) {
+    fn can_glyph_join(&self, index: usize) -> bool {
+        if self.glyphs[index - 1].rect.x + self.glyphs[index - 1].rect.width - (WORD_SPACING / 4)
+            > self.glyphs[index].rect.x
+        {
+            return true;
+        }
+
+        self.glyphs[index].dist.unwrap_or(f32::INFINITY) > DIST_THRESHOLD
+    }
+    pub fn guess(&mut self, fontbase: &FontBase, baseline: u32) {
         let length = self.glyphs.len();
 
         for glyph in &mut self.glyphs {
-            glyph.try_guess(fontbase, length, None);
+            glyph.try_guess(baseline, fontbase, length, None, true);
+        }
+
+        let mut base_index: usize = self.glyphs.len();
+        'outer: while base_index > 1 {
+            base_index -= 1;
+            let mut dist = self.glyphs[base_index].dist.unwrap_or(f32::INFINITY);
+            if !self.can_glyph_join(base_index) {
+                continue 'outer;
+            }
+
+            for collapse_length in 1..=2 {
+                if base_index < collapse_length {
+                    continue 'outer;
+                }
+                dist += self.glyphs[base_index - collapse_length]
+                    .dist
+                    .unwrap_or(f32::INFINITY);
+
+                let mut joined = self.glyphs[base_index].join(&self.glyphs[base_index - 1]);
+                for i in 2..=collapse_length {
+                    joined = joined.join(&self.glyphs[base_index - i]);
+                }
+                joined.try_guess(baseline, fontbase, length, None, true);
+
+                if joined.dist.unwrap_or(f32::INFINITY) < dist {
+                    for _ in 0..(collapse_length + 1) {
+                        self.glyphs.remove(base_index - collapse_length);
+                    }
+                    self.glyphs.insert(base_index - collapse_length, joined);
+                    base_index -= collapse_length;
+
+                    continue 'outer;
+                }
+            }
+        }
+
+        for glyph in &mut self.glyphs {
+            if glyph.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
+                glyph.try_guess(baseline, fontbase, length, None, false);
+            }
         }
 
         // let hint = Option::zip(self.get_code(), self.get_size());
         // for glyph in &mut self.glyphs {
         // glyph.try_guess(fontbase, length, hint);
         // }
+    }
+    pub fn correct_font_guess(&mut self, fontbase: &FontBase, baseline: u32, code: Code) {
+        let length = self.glyphs.len();
+
+        for glyph in &mut self.glyphs {
+            glyph.try_guess(
+                baseline,
+                fontbase,
+                length,
+                Some((code, Size::Normalsize)),
+                true,
+            );
+        }
     }
 
     pub fn get_code(&self) -> Option<Code> {
@@ -120,6 +198,7 @@ impl Word {
 
 pub struct Line {
     pub rect: Rect,
+    pub baseline: u32,
     pub words: Vec<Word>,
 }
 
@@ -135,15 +214,50 @@ impl Line {
     }
 
     pub fn from(rect: Rect, image: &DynamicImage) -> Line {
+        let words = Line::find_words(rect, image);
+
+        let mut bottoms = HashMap::new();
+        for word in words.as_slice() {
+            for glyph in word.glyphs.as_slice() {
+                bottoms
+                    .entry(glyph.rect.y + glyph.rect.height)
+                    .or_insert(0)
+                    .add_assign(1);
+            }
+        }
+
+        let baseline = bottoms.into_iter().max_by_key(|&(_, c)| c).unwrap().0;
+
         Line {
             rect,
-            words: Line::find_words(rect, image),
+            words,
+            baseline,
         }
+    }
+
+    pub fn get_code(&self) -> Code {
+        let mut count = HashMap::new();
+        for w in self.words.iter() {
+            for g in w.glyphs.iter() {
+                if g.guess.is_some() {
+                    count
+                        .entry(g.guess.as_ref().unwrap().code)
+                        .or_insert(0)
+                        .add_assign(1);
+                }
+            }
+        }
+
+        count
+            .into_iter()
+            .max_by_key(|&(_, c)| c)
+            .unwrap_or((Code::Lmr, 0))
+            .0
     }
 
     pub fn guess(&mut self, fontbase: &FontBase) {
         for word in &mut self.words {
-            word.guess(fontbase);
+            word.guess(fontbase, self.baseline);
         }
     }
 
