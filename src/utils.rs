@@ -1,12 +1,13 @@
 use crate::result::{Error, Result};
 use image::{DynamicImage, GrayImage};
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::ops::AddAssign;
 use std::path::Path;
 use std::process::Command;
 use std::{collections::HashMap, hash::Hash};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,

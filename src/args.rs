@@ -1,6 +1,8 @@
 use clap::{arg, command, Parser};
 use std::path::PathBuf;
 
+use crate::font::Code;
+
 #[derive(Parser)]
 #[command(author, version, about)]
 pub struct Args {
@@ -11,9 +13,9 @@ pub struct Args {
     #[arg(short, long)]
     pub output: Option<PathBuf>,
 
-    /// Font size in pt
-    #[arg(short, long, default_value_t = 11, value_parser = clap::value_parser!(u32).range(10..=12))]
-    pub pt: u32,
+    /// Create font files
+    #[arg(short, long, value_enum)]
+    pub create: Option<Vec<Code>>,
 
     /// Silent mode
     #[arg(short, long, default_value_t = false)]

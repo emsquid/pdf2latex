@@ -1,10 +1,10 @@
-use crate::args::Args;
 use crate::font::{Code, FontBase, Size, Style};
-use crate::result::Result;
-use crate::utils::{flood_fill, Rect};
-use ab_glyph::{Font, FontVec, GlyphId};
+use crate::result::{Error, Result};
+use crate::utils::{find_parts, flood_fill, Rect};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::process::Command;
 
 pub const DIST_THRESHOLD: f32 = 0.5;
 pub const CHAR_THRESHOLD: u8 = 50;
@@ -62,15 +62,18 @@ pub trait Glyph {
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct KnownGlyph {
-    pub chr: char,
+    pub base: String,
     pub code: Code,
     pub size: Size,
-    pub styles: Vec<Style>,
+    pub style: Style,
+    pub modifiers: Vec<String>,
+    pub math: bool,
 
     pub rect: Rect,
     pub image: Vec<u8>,
+    pub offset: i32,
 }
 
 impl Glyph for KnownGlyph {
@@ -84,39 +87,101 @@ impl Glyph for KnownGlyph {
 }
 
 impl KnownGlyph {
-    pub fn try_from(
-        font: &FontVec,
-        data: (GlyphId, char, Code, Size, &Vec<Style>),
-        args: &Args,
-    ) -> Option<KnownGlyph> {
-        let (id, chr, code, size, styles) = data;
-        let scale = font
-            .pt_to_px_scale(size.as_pt(args.pt) * 512. / 96.)
-            .unwrap();
-        let glyph = id.with_scale(scale);
+    pub fn from(
+        base: &str,
+        code: Code,
+        size: Size,
+        style: Style,
+        modifiers: Vec<String>,
+        math: bool,
+        id: u32,
+    ) -> Result<KnownGlyph> {
+        let (image, offset) = Self::render(base, code, size, style, modifiers.clone(), math, id)?;
 
-        if let Some(outlined) = font.outline_glyph(glyph) {
-            let bounds = outlined.px_bounds();
-            let point = bounds.max - bounds.min;
-            let rect = Rect::new(0, 0, point.x as u32, point.y as u32);
+        Ok(KnownGlyph {
+            base: base.to_string(),
+            code,
+            size,
+            style,
+            modifiers,
+            math,
+            rect: Rect::new(0, 0, image.width(), image.height()),
+            image: image.to_luma8().into_raw(),
+            offset,
+        })
+    }
 
-            let mut image = RgbImage::from_pixel(rect.width, rect.height, Rgb([255, 255, 255]));
-            outlined.draw(|x, y, v| {
-                let c = (255. - v * 255.) as u8;
-                image.put_pixel(x, y, Rgb([c, c, c]));
-            });
+    fn render(
+        base: &str,
+        code: Code,
+        size: Size,
+        style: Style,
+        modifiers: Vec<String>,
+        math: bool,
+        id: u32,
+    ) -> Result<(DynamicImage, i32)> {
+        let latex = Self::latex(base, size, style, modifiers, math);
+        let doc = format!(
+            "\\documentclass[11pt, border=4pt]{{standalone}}
+            \\usepackage{{amsmath, amssymb, amsthm}}
+            \\usepackage{{euscript}}
+            \\begin{{document}}
+            . {{\\fontfamily{{{code}}}\\selectfont
+                {latex}
+            }}
+            \\end{{document}}"
+        );
+        std::fs::write(format!("temp/{id}.tex"), doc)?;
 
-            Some(KnownGlyph {
-                chr,
-                code,
-                size,
-                styles: styles.clone(),
-                rect,
-                image: DynamicImage::ImageRgb8(image).to_luma8().into_raw(),
-            })
-        } else {
-            None
+        Command::new("pdflatex")
+            .args(["-output-directory=temp", format!("temp/{id}.tex").as_str()])
+            .output()?;
+
+        let output = Command::new("pdftoppm")
+            .args(["-r", "512", format!("temp/{id}.pdf").as_str()])
+            .output()?;
+
+        match output.stderr.len() {
+            0 => {
+                let image = image::load_from_memory(&output.stdout)?;
+                Ok(Self::find_glyph(&image))
+            }
+            _ => Err(Error::Custom("Render error: couldn't compile latex")),
         }
+    }
+
+    fn latex(base: &str, size: Size, style: Style, modifiers: Vec<String>, math: bool) -> String {
+        let mut base = modifiers
+            .iter()
+            .fold(base.to_string(), |acc, modif| format!("\\{modif}{{{acc}}}"));
+        base = if math { format!("${base}$") } else { base };
+        size.apply(style.apply(base))
+    }
+
+    fn find_baseline(image: &DynamicImage) -> u32 {
+        let image = image.crop_imm(0, 0, 42, image.height());
+
+        find_parts(&image.to_luma8(), 0)
+            .last()
+            .unwrap_or(&(0, image.height()))
+            .1
+    }
+
+    fn find_glyph(image: &DynamicImage) -> (DynamicImage, i32) {
+        let baseline = Self::find_baseline(&image);
+        let image = image.crop_imm(42, 0, image.width(), image.height());
+
+        let vertical = find_parts(&image.to_luma8(), 0);
+        let y = vertical.first().unwrap_or(&(0, 0)).0;
+        let height = vertical.last().unwrap_or(&(0, image.height())).1 - y + 1;
+
+        let horizontal = find_parts(&image.rotate90().to_luma8(), 0);
+        let x = horizontal.first().unwrap_or(&(0, 0)).0;
+        let width = horizontal.last().unwrap_or(&(0, image.width())).1 - x + 1;
+
+        let offset = (y + height - 1 - baseline) as i32;
+
+        (image.crop_imm(x, y, width, height), offset)
     }
 }
 
@@ -204,8 +269,8 @@ impl UnknownGlyph {
         word_length: usize,
         hint: Option<(Code, Size)>,
     ) {
-        let bonus = |chr: char| {
-            if chr.is_ascii() && word_length > 1 {
+        let bonus = |base: &String| {
+            if base.len() == 1 && base.is_ascii() && word_length > 1 {
                 1. - ASCII_BONUS
             } else {
                 1.
@@ -214,7 +279,7 @@ impl UnknownGlyph {
 
         let (code, size) = hint.unzip();
         let mut closest = self.dist.unwrap_or(f32::MAX / 1.1) * 1.1;
-        for (&key, family) in &fontbase.glyphs {
+        'outer: for (&key, family) in &fontbase.glyphs {
             if code.is_some() && Some(key) != code {
                 continue;
             }
@@ -230,7 +295,8 @@ impl UnknownGlyph {
                             }
 
                             let dist = self.distance(glyph, closest / (1. - ASCII_BONUS))
-                                * bonus(glyph.chr);
+                                * bonus(&glyph.base);
+
                             if dist < closest {
                                 closest = dist;
                                 self.dist = Some(dist);
@@ -238,7 +304,7 @@ impl UnknownGlyph {
                             }
 
                             if dist < DIST_THRESHOLD {
-                                return;
+                                continue 'outer;
                             }
                         }
                     }

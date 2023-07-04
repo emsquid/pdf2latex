@@ -2,6 +2,7 @@ __pycache__
 python/temp/*
 test.py
 
+temp/*
 test/*
 !test/*.pdf
 

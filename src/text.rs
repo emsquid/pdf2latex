@@ -1,6 +1,5 @@
-use crate::dictionary::Dictionary;
 use crate::font::{Code, FontBase, Size, Style};
-use crate::glyph::{Glyph, UnknownGlyph, CHAR_THRESHOLD};
+use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
 
@@ -76,8 +75,8 @@ impl Word {
         self.glyphs
             .iter()
             .map(|glyph| match &glyph.guess {
-                Some(guess) => guess.chr,
-                None => '\u{2584}',
+                Some(guess) => guess.base.clone(),
+                None => '\u{2584}'.to_string(),
             })
             .collect()
     }
@@ -88,19 +87,19 @@ impl Word {
             .map(|glyph| {
                 let mut content = String::new();
                 if let Some(guess) = &glyph.guess {
-                    if !guess.chr.is_ascii() {
+                    if !guess.base.is_ascii() {
                         content.push_str("\x1b[31m");
                     }
-                    if guess.styles.contains(&Style::Bold) {
+                    if guess.style == Style::Bold {
                         content.push_str("\x1b[1;32m");
                     }
-                    if guess.styles.contains(&Style::Italic) {
+                    if guess.style == Style::Italic {
                         content.push_str("\x1b[3;34m");
                     }
-                    if guess.styles.contains(&Style::Slanted) {
+                    if guess.style == Style::Slanted {
                         content.push_str("\x1b[3;35m");
                     }
-                    content.push(guess.chr);
+                    content.push_str(&guess.base);
                 } else {
                     content.push_str("\x1b[33m");
                     content.push('\u{2584}');

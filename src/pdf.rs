@@ -187,19 +187,6 @@ impl Pdf {
     }
 
     pub fn debug_content(&self) -> Result<String> {
-        for (p, page) in self.pages.iter().enumerate() {
-            for (l, line) in page.lines.iter().enumerate() {
-                for (w, word) in line.words.iter().enumerate() {
-                    for (g, glyph) in word.glyphs.iter().enumerate() {
-                        if let Some(guess) = &glyph.guess {
-                            glyph.save(&format!("test/debug_{p}_{l}_{w}_{g}_o.png"))?;
-                            guess.save(&format!("test/debug_{p}_{l}_{w}_{g}_g.png"))?;
-                        }
-                    }
-                }
-            }
-        }
-
         Ok(self
             .pages
             .iter()

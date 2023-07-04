@@ -1,64 +1,61 @@
+use crate::args::Args;
 use crate::glyph::KnownGlyph;
 use crate::result::Result;
 use crate::utils::log;
-use crate::{args::Args, glyph::Glyph};
-use ab_glyph::{Font, FontVec};
+use clap::ValueEnum;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Write;
 use std::time;
-use ucd::{Codepoint, Script, UnicodeBlock, UnicodeCategory};
 
-const WHITELIST_SCRIPT: &[Script] = &[
-    Script::Common,
-    Script::Gothic,
-    Script::Greek,
-    Script::Hebrew,
-    Script::Latin,
+const ALPHABET: &str = "abcdefghijklmnopqrstuvwxyz";
+const PUNCTUATIONS: &[&str] = &[
+    ".", ",", ";", ":", "!", "?", "'", "\"", "-", "--", "---", "(", ")", "\\{", "\\}", "[", "]",
+];
+const LIGATURES: &[&str] = &["ff", "fi", "fl", "ffi", "ffl", "ae"];
+const ACCENTS: &[&str] = &["overline", "vec", "overrightarrow", "widehat", "widetilde"];
+const GREEKS: &[&str] = &[
+    "alpha",
+    "beta",
+    "gamma",
+    "Gamma",
+    "delta",
+    "Delta",
+    "epsilon",
+    "varepsilon",
+    "zeta",
+    "eta",
+    "theta",
+    "vartheta",
+    "Theta",
+    "iota",
+    "kappa",
+    "lambda",
+    "Lambda",
+    "mu",
+    "nu",
+    "xi",
+    "Xi",
+    "pi",
+    "Pi",
+    "rho",
+    "varrho",
+    "sigma",
+    "Sigma",
+    "tau",
+    "upsilon",
+    "Upsilon",
+    "phi",
+    "varphi",
+    "Phi",
+    "chi",
+    "psi",
+    "Psi",
+    "omega",
+    "Omega",
 ];
 
-const WHITELIST_BLOCK: &[UnicodeBlock] = &[
-    UnicodeBlock::AlphabeticPresentationForms,
-    UnicodeBlock::Arrows,
-    UnicodeBlock::BasicLatin,
-    UnicodeBlock::GeometricShapes,
-    UnicodeBlock::Gothic,
-    UnicodeBlock::GreekandCoptic,
-    UnicodeBlock::Hebrew,
-    UnicodeBlock::GeneralPunctuation,
-    UnicodeBlock::Latin1Supplement,
-    UnicodeBlock::LetterlikeSymbols,
-    UnicodeBlock::MathematicalAlphanumericSymbols,
-    UnicodeBlock::MathematicalOperators,
-    UnicodeBlock::MiscellaneousMathematicalSymbolsA,
-    UnicodeBlock::MiscellaneousMathematicalSymbolsB,
-    UnicodeBlock::SuperscriptsandSubscripts,
-    UnicodeBlock::SupplementalArrowsA,
-    UnicodeBlock::SupplementalArrowsB,
-    UnicodeBlock::SupplementalMathematicalOperators,
-];
-
-const WHITELIST_CATEGORY: &[UnicodeCategory] = &[
-    UnicodeCategory::ClosePunctuation,
-    UnicodeCategory::ConnectorPunctuation,
-    UnicodeCategory::CurrencySymbol,
-    UnicodeCategory::DashPunctuation,
-    UnicodeCategory::DecimalNumber,
-    UnicodeCategory::FinalPunctuation,
-    UnicodeCategory::InitialPunctuation,
-    UnicodeCategory::LetterNumber,
-    UnicodeCategory::LowercaseLetter,
-    UnicodeCategory::MathSymbol,
-    UnicodeCategory::ModifierLetter,
-    UnicodeCategory::OpenPunctuation,
-    UnicodeCategory::OtherLetter,
-    UnicodeCategory::OtherPunctuation,
-    UnicodeCategory::OtherSymbol,
-    UnicodeCategory::UppercaseLetter,
-];
-
-const BLACKLIST: &[char] = &['·'];
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
 pub enum Code {
     Cmr,
     Lmr,
@@ -67,7 +64,6 @@ pub enum Code {
     Qcr,
     Qcs,
     Qpl,
-    Xits,
 }
 
 impl std::fmt::Display for Code {
@@ -80,7 +76,6 @@ impl std::fmt::Display for Code {
             Code::Qcr => "qcr",
             Code::Qcs => "qcs",
             Code::Qpl => "qpl",
-            Code::Xits => "xits",
         };
         write!(f, "{string}")
     }
@@ -96,20 +91,15 @@ impl Code {
             Code::Qcr,
             Code::Qcs,
             Code::Qpl,
-            Code::Xits,
         ]
     }
 
     pub fn as_path(&self) -> String {
-        format!("fonts/{self}")
-    }
-
-    pub fn count() -> usize {
-        Code::all().len()
+        format!("fonts/{self}.json")
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Size {
     Tiny,
     Scriptsize,
@@ -121,6 +111,24 @@ pub enum Size {
     LLLarge,
     Huge,
     HHuge,
+}
+
+impl std::fmt::Display for Size {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            Size::Tiny => "tiny",
+            Size::Scriptsize => "scriptsize",
+            Size::Footnotesize => "footnotesize",
+            Size::Small => "small",
+            Size::Normalsize => "normalsize",
+            Size::Large => "large",
+            Size::LLarge => "Large",
+            Size::LLLarge => "LARGE",
+            Size::Huge => "huge",
+            Size::HHuge => "Huge",
+        };
+        write!(f, "{string}")
+    }
 }
 
 impl Size {
@@ -139,50 +147,14 @@ impl Size {
         ]
     }
 
-    pub fn as_pt(&self, base: u32) -> f32 {
-        match base {
-            10 => match self {
-                Size::Tiny => 5.,
-                Size::Scriptsize => 7.,
-                Size::Footnotesize => 8.,
-                Size::Small => 9.,
-                Size::Normalsize => 10.,
-                Size::Large => 12.,
-                Size::LLarge => 14.4,
-                Size::LLLarge => 17.28,
-                Size::Huge => 20.74,
-                Size::HHuge => 24.88,
-            },
-            11 => match self {
-                Size::Tiny => 6.,
-                Size::Scriptsize => 8.,
-                Size::Footnotesize => 9.,
-                Size::Small => 10.,
-                Size::Normalsize => 10.95,
-                Size::Large => 12.,
-                Size::LLarge => 14.4,
-                Size::LLLarge => 17.28,
-                Size::Huge => 20.74,
-                Size::HHuge => 24.88,
-            },
-            12 => match self {
-                Size::Tiny => 6.,
-                Size::Scriptsize => 8.,
-                Size::Footnotesize => 10.,
-                Size::Small => 10.95,
-                Size::Normalsize => 12.,
-                Size::Large => 14.4,
-                Size::LLarge => 17.28,
-                Size::LLLarge => 20.74,
-                Size::Huge | Size::HHuge => 24.88,
-            },
-            _ => 0.,
-        }
+    pub fn apply(&self, symbol: String) -> String {
+        format!("\\{self}{{{symbol}}}")
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Style {
+    Normal,
     Bold,
     Italic,
     Slanted,
@@ -191,43 +163,68 @@ pub enum Style {
     BlackBoard,
     Calligraphic,
     Fraktur,
-    SmallCaps,
-    TypeWriter,
+    EuScript,
+}
+
+impl std::fmt::Display for Style {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            Style::Normal => "textnormal",
+            Style::Bold => "textbf",
+            Style::Italic => "textit",
+            Style::Slanted => "textsl",
+            Style::SansSerif => "textsf",
+            Style::BlackBoard => "mathbb",
+            Style::Calligraphic => "mathcal",
+            Style::Fraktur => "mathfrak",
+            Style::EuScript => "EuScript",
+        };
+        write!(f, "{string}")
+    }
 }
 
 impl Style {
-    pub fn from(path: &str) -> Vec<Style> {
-        let mut styles = Vec::new();
+    pub fn all() -> Vec<Style> {
+        vec![
+            Style::Normal,
+            Style::Bold,
+            Style::Italic,
+            Style::Slanted,
+            Style::SansSerif,
+            Style::BlackBoard,
+            Style::Calligraphic,
+            Style::Fraktur,
+            Style::EuScript,
+        ]
+    }
 
-        if path.contains("bold") {
-            styles.push(Style::Bold);
-        }
-        if path.contains("italic") {
-            styles.push(Style::Italic);
-        }
-        if path.contains("slant") {
-            styles.push(Style::Slanted);
-        }
-        if path.contains("sansserif") {
-            styles.push(Style::SansSerif);
-        }
-        if path.contains("blackboard") {
-            styles.push(Style::BlackBoard);
-        }
-        if path.contains("calligraphic") {
-            styles.push(Style::Calligraphic);
-        }
-        if path.contains("fraktur") {
-            styles.push(Style::Fraktur);
-        }
-        if path.contains("smallcaps") {
-            styles.push(Style::SmallCaps);
-        }
-        if path.contains("typewriter") {
-            styles.push(Style::TypeWriter);
-        }
+    pub fn text() -> Vec<Style> {
+        vec![
+            Style::Normal,
+            Style::Bold,
+            Style::Italic,
+            Style::Slanted,
+            Style::SansSerif,
+        ]
+    }
 
-        styles
+    pub fn math() -> Vec<Style> {
+        vec![
+            Style::BlackBoard,
+            Style::Calligraphic,
+            Style::Fraktur,
+            Style::EuScript,
+        ]
+    }
+
+    pub fn apply(&self, base: String) -> String {
+        match Self::math().contains(self) {
+            true => {
+                let base = base.replace("$", "");
+                format!("$\\{self}{{{base}}}$")
+            }
+            false => format!("\\{self}{{{base}}}"),
+        }
     }
 }
 
@@ -236,77 +233,6 @@ pub struct FontBase {
 }
 
 impl FontBase {
-    fn load_font(
-        path: &str,
-        code: Code,
-        args: &Args,
-    ) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
-        let font = FontVec::try_from_vec(std::fs::read(path)?)?;
-        let styles = Style::from(path);
-
-        let mut glyphs = HashMap::new();
-        for size in Size::all() {
-            for (id, chr) in font.codepoint_ids() {
-                if let (Some(script), Some(block), category) =
-                    (chr.script(), chr.block(), chr.category())
-                {
-                    if !WHITELIST_SCRIPT.contains(&script)
-                        || !WHITELIST_BLOCK.contains(&block)
-                        || !WHITELIST_CATEGORY.contains(&category)
-                        || BLACKLIST.contains(&chr)
-                    {
-                        continue;
-                    }
-                    let data = (id, chr, code, size, &styles);
-                    if let Some(glyph) = KnownGlyph::try_from(&font, data, args) {
-                        let key = (glyph.rect.width, glyph.rect.height);
-                        glyphs.entry(key).or_insert(Vec::new()).push(glyph);
-                    }
-                }
-            }
-        }
-
-        Ok(glyphs)
-    }
-
-    fn load_family(code: Code, args: &Args) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
-        let files = std::fs::read_dir(code.as_path())?;
-        let step = 1. / std::fs::read_dir(code.as_path())?.count() as f32;
-
-        let now = time::Instant::now();
-        let mut progress = 0.;
-
-        if !args.silent {
-            log(&format!("loading font {code}"), Some(0.), None, "s")?;
-        }
-
-        let mut family = HashMap::new();
-        for file in files {
-            let path = file?.path();
-            for (key, glyphs) in FontBase::load_font(&path.to_string_lossy(), code, args)? {
-                family.entry(key).or_insert(Vec::new()).extend(glyphs);
-            }
-
-            progress += step;
-            if !args.silent {
-                log(&format!("loading font {code}"), Some(progress), None, "u")?;
-            }
-        }
-
-        let duration = now.elapsed().as_secs_f32();
-        if !args.silent {
-            log(
-                &format!("loading font {code}"),
-                Some(1.),
-                Some(duration),
-                "u",
-            )?;
-            std::io::stdout().write_all(b"\n")?;
-        }
-
-        Ok(family)
-    }
-
     pub fn new(args: &Args) -> Result<FontBase> {
         let now = time::Instant::now();
 
@@ -314,22 +240,202 @@ impl FontBase {
             log("LOADING FONTS\n", None, None, "1m")?;
         }
 
+        if let Some(codes) = &args.create {
+            for code in codes {
+                Self::create_family(*code)?;
+            }
+        }
+
         let mut glyphs = HashMap::new();
         for code in Code::all() {
-            glyphs.insert(code, FontBase::load_family(code, args)?);
+            glyphs.insert(code, Self::load_family(code)?);
         }
 
         let duration = now.elapsed().as_secs_f32();
         if !args.silent {
-            log(
-                &format!("{} LOADED", Code::count()),
-                None,
-                Some(duration),
-                "1m",
-            )?;
+            log("LOADED FONTS", None, Some(duration), "1m")?;
             std::io::stdout().write_all(b"\n")?;
         }
 
         Ok(FontBase { glyphs })
+    }
+
+    fn get_family(code: Code) -> Result<Vec<KnownGlyph>> {
+        if let Ok(json) = std::fs::read_to_string(code.as_path()) {
+            let glyphs: Vec<KnownGlyph> = serde_json::from_str(&json)?;
+
+            Ok(glyphs)
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    fn create_family(code: Code) -> Result<()> {
+        std::thread::scope(|scope| -> Result<()> {
+            std::fs::create_dir_all("temp")?;
+
+            log(&format!("creating font {code}"), Some(0.), None, "s")?;
+
+            let mut id = 0;
+            let mut handles = Vec::new();
+            let mut glyphs = Self::get_family(code)?;
+            let (symbols, count) = Self::generate_symbols();
+            for (base, sizes, styles, modifiers, math) in symbols {
+                for style in styles.clone() {
+                    for size in sizes.clone() {
+                        if glyphs.iter().any(|g| {
+                            g.base == base
+                                && g.size == size
+                                && g.style == style
+                                && g.modifiers == modifiers
+                                && g.math == math
+                        }) {
+                            continue;
+                        }
+
+                        let t_base = base.clone();
+                        let t_modifiers = modifiers.clone();
+                        handles.push(scope.spawn(move || {
+                            KnownGlyph::from(&t_base, code, size, style, t_modifiers, math, id)
+                        }));
+
+                        if handles.len() >= 8 {
+                            let glyph = handles.remove(0).join().unwrap()?;
+                            glyphs.push(glyph);
+                        }
+
+                        log(
+                            &format!("creating font {code}"),
+                            Some(id as f32 / count as f32),
+                            None,
+                            "u",
+                        )?;
+                        id += 1;
+                    }
+                }
+            }
+
+            for handle in handles {
+                let glyph = handle.join().unwrap()?;
+                glyphs.push(glyph);
+            }
+
+            log(&format!("created font {code}"), Some(1.), None, "u")?;
+            std::io::stdout().write_all(b"\n")?;
+
+            let json = serde_json::to_string(&glyphs)?;
+            std::fs::write(code.as_path(), json)?;
+            std::fs::remove_dir_all("temp")?;
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }
+
+    fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
+        let mut family = HashMap::new();
+        for glyph in Self::get_family(code)? {
+            family
+                .entry((glyph.rect.width, glyph.rect.height))
+                .or_insert(Vec::new())
+                .push(glyph);
+        }
+
+        Ok(family)
+    }
+
+    fn generate_alphanumeric() -> Vec<(String, Vec<Size>, Vec<Style>, Vec<String>, bool)> {
+        let mut symbols = Vec::new();
+        for chr in ALPHABET.chars() {
+            symbols.push((
+                chr.to_lowercase().to_string(),
+                Size::all(),
+                Style::text(),
+                vec![],
+                false,
+            ));
+            symbols.push((
+                chr.to_uppercase().to_string(),
+                Size::all(),
+                Style::all(),
+                vec![],
+                false,
+            ));
+        }
+        for n in 0..10 {
+            symbols.push((n.to_string(), Size::all(), Style::text(), vec![], false));
+        }
+
+        symbols
+    }
+
+    fn generate_accents() -> Vec<(String, Vec<Size>, Vec<Style>, Vec<String>, bool)> {
+        let mut symbols = Vec::new();
+        for accent in ACCENTS {
+            for chr in ALPHABET.chars() {
+                symbols.push((
+                    chr.to_lowercase().to_string(),
+                    Size::all(),
+                    Style::text(),
+                    vec![accent.to_string()],
+                    true,
+                ));
+                symbols.push((
+                    chr.to_uppercase().to_string(),
+                    Size::all(),
+                    Style::all(),
+                    vec![accent.to_string()],
+                    true,
+                ));
+            }
+        }
+
+        symbols
+    }
+
+    fn generate_ligatures() -> Vec<(String, Vec<Size>, Vec<Style>, Vec<String>, bool)> {
+        LIGATURES
+            .into_iter()
+            .map(|lig| (lig.to_string(), Size::all(), Style::text(), vec![], false))
+            .collect()
+    }
+
+    fn generate_punctuations() -> Vec<(String, Vec<Size>, Vec<Style>, Vec<String>, bool)> {
+        PUNCTUATIONS
+            .into_iter()
+            .map(|punct| (punct.to_string(), Size::all(), Style::text(), vec![], false))
+            .collect()
+    }
+
+    fn generate_greek() -> Vec<(String, Vec<Size>, Vec<Style>, Vec<String>, bool)> {
+        GREEKS
+            .into_iter()
+            .map(|greek| {
+                (
+                    format!("\\{}", greek),
+                    Size::all(),
+                    vec![Style::Normal],
+                    vec![],
+                    true,
+                )
+            })
+            .collect()
+    }
+
+    fn generate_symbols() -> (
+        Vec<(String, Vec<Size>, Vec<Style>, Vec<String>, bool)>,
+        usize,
+    ) {
+        let mut symbols = Vec::new();
+
+        symbols.extend(Self::generate_alphanumeric());
+        symbols.extend(Self::generate_ligatures());
+        symbols.extend(Self::generate_punctuations());
+        symbols.extend(Self::generate_accents());
+        symbols.extend(Self::generate_greek());
+
+        let count = symbols.iter().map(|d| d.1.len() * d.2.len()).sum();
+        (symbols, count)
     }
 }

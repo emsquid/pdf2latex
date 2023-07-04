@@ -8,6 +8,8 @@ pub enum Error {
     Image(image::error::ImageError),
     /// Font error
     Font(ab_glyph::InvalidFont),
+    /// Serde error
+    Serde(serde_json::Error),
     /// Custom error
     Custom(&'static str),
 }
@@ -19,6 +21,7 @@ impl std::fmt::Display for Error {
             Error::Parsing(err) => write!(f, "Parsing error: {err}"),
             Error::Image(err) => write!(f, "Image error: {err}"),
             Error::Font(err) => write!(f, "Font error: {err}"),
+            Error::Serde(err) => write!(f, "Serde error: {err}"),
             Error::Custom(err) => write!(f, "{err}"),
         }
     }
@@ -47,6 +50,12 @@ impl From<image::ImageError> for Error {
 impl From<ab_glyph::InvalidFont> for Error {
     fn from(err: ab_glyph::InvalidFont) -> Self {
         Error::Font(err)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
+        Error::Serde(err)
     }
 }
 
