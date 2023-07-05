@@ -74,19 +74,16 @@ impl Dictionary {
             return String::from(string)
         }
         let iter: Vec<(usize, &str)> = string.grapheme_indices(true).collect();
-        for (i, _) in iter.iter() {
+        for (i, _) in iter.iter().rev() {
             let (s, e) = string.split_at(*i);
-            if self.in_dict(e){
-                if self.in_dict(s){
-                    let v = [s,e];
-                    return v.join(" ")
+            if self.in_dict(s){
+                if self.in_dict(e){
+                    return [s,e].join(" ")
                 }
                 else {
-                    let mut ns = self.jaro_space(s);
-                    if ns != s{
-                        ns.push(' ');
-                        ns.push_str(e);
-                        return ns
+                    let ne = self.jaro_space(e);
+                    if ne != e{
+                        return [s, &ne].join(" ")
                     }
                 }
             }
@@ -264,7 +261,7 @@ impl Dictionary {
         let mut cross_lines: Vec<usize> = Vec::new();
         for i in 0..lines.len() {
             cross_lines.push(0);
-            if lines[i].ends_with('-') && lines.last().unwrap() != &lines[i] {
+            if lines[i].ends_with('-') && i != lines.len() - 1 {
                 lines[i].pop();
                 while !lines[i + 1].starts_with(" ") {
                     let chr = lines[i + 1].remove(0);
@@ -272,7 +269,7 @@ impl Dictionary {
                     cross_lines[i] += 1;
                 }
             }
-            println!("LIGNE {i}");
+            println!("LIGNE {} :", i);
             self.correct_line(&lines[i]);
             println!("FIN {i}");
         }

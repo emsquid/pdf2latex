@@ -3,7 +3,7 @@ use std::process::exit;
 
 use crate::dictionary::Dictionary;
 use crate::font::{Code, FontBase, Size, Style};
-use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD, Glyph, DIST_UNALIGNED_THRESHOLD};
+use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD, Glyph};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
 use std::{collections::HashMap};
@@ -81,23 +81,34 @@ impl Word {
                 }
                 joined.try_guess(baseline, fontbase, length, None, true);
 
+                // if self.glyphs[base_index].guess.is_some() && self.glyphs[base_index - 1].guess.is_some() && joined.guess.is_some() {
+                //     println!("{}, {} -> {} ({} -> {})",
+                //         self.glyphs[base_index].guess.as_ref().unwrap().chr,
+                //         &self.glyphs[base_index - 1].guess.as_ref().unwrap().chr,
+                //         joined.guess.as_ref().unwrap().chr,
+                //         dist,
+                //         joined.dist.unwrap_or(f32::INFINITY)
+                //     );
+                // }
+
                 if joined.dist.unwrap_or(f32::INFINITY) < dist {
                     for _ in 0..(collapse_length + 1) {
                         self.glyphs.remove(base_index - collapse_length);
                     }
                     self.glyphs.insert(base_index - collapse_length, joined);
 
+                    base_index -= collapse_length;
                     continue 'outer;
                 }
             }
         }
 
 
-        for glyph in &mut self.glyphs {
-            if glyph.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
-                glyph.try_guess(baseline, fontbase, length, None, false);
-            }
-        }
+        // for glyph in &mut self.glyphs {
+        //     if glyph.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
+        //         glyph.try_guess(baseline, fontbase, length, None, false);
+        //     }
+        // }
 
         // let hint = Option::zip(self.get_code(), self.get_size());
         // for glyph in &mut self.glyphs {

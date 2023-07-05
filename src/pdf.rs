@@ -146,21 +146,23 @@ impl Page {
                     //         copy.put_pixel(glyph.rect.x + x, glyph.rect.y + y, c)
                     //     }
                     // }}
-                    let guess = glyph.guess.as_ref().unwrap();
-                    for x in 0..guess.rect.width {
-                    for y in 0..guess.rect.height {
-                        if guess.get_pixel(x, y) < 0.9 {
-                            let v = (255. * guess.get_pixel(x, y)) as u8;
-                            let c = match alt {
-                                0 => Rgba([255, v, v, 255]),
-                                1 => Rgba([v, 255, v, 255]),
-                                2 => Rgba([v, v, 255, 255]),
-                                3 => Rgba([255, 255, v, 255]),
-                                _ => Rgba([v, 255, 255, 255])
-                            };
-                            copy.put_pixel(glyph.rect.x + x, (line.baseline + y).saturating_add_signed(guess.baseline_offset), c)
-                        }
-                    }}
+                    if glyph.guess.is_some() {
+                        let guess = glyph.guess.as_ref().unwrap();
+                        for x in 0..guess.rect.width {
+                        for y in 0..guess.rect.height {
+                            if guess.get_pixel(x, y) < 0.9 {
+                                let v = (255. * guess.get_pixel(x, y)) as u8;
+                                let c = match alt {
+                                    0 => Rgba([255, v, v, 255]),
+                                    1 => Rgba([v, 255, v, 255]),
+                                    2 => Rgba([v, v, 255, 255]),
+                                    3 => Rgba([255, 255, v, 255]),
+                                    _ => Rgba([v, 255, 255, 255])
+                                };
+                                copy.put_pixel(glyph.rect.x + x, (line.baseline + y).saturating_add_signed(guess.baseline_offset), c)
+                            }
+                        }}
+                    }
 
                     overlay(
                         &mut copy,
@@ -226,7 +228,7 @@ impl Pdf {
             .collect::<Vec<String>>()
             .join("\n");
 
-        //Ok(dictionary.correct_text(content)
+        //Ok(dictionary.correct_text(content))
         Ok(content)
     }
 

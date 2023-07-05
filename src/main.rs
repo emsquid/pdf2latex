@@ -1,4 +1,5 @@
 use clap::Parser;
+use crate::dictionary::Dictionary;
 
 mod args;
 mod dictionary;

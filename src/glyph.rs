@@ -252,7 +252,7 @@ impl UnknownGlyph {
                                 * bonus(glyph.chr);
                             if dist < closest {
                                 closest = dist;
-                                self.dist = Some(dist);
+                                self.dist = Some(dist + is_aligned.then_some(0).unwrap_or(offset.abs()) as f32);
                                 self.guess = Some(glyph.clone());
                             }
 
@@ -263,6 +263,10 @@ impl UnknownGlyph {
                     }
                 }
             }
+        }
+
+        if is_aligned && self.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
+            self.try_guess(baseline, fontbase, word_length, hint, false);
         }
     }
 }
