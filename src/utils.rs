@@ -1,12 +1,13 @@
 use crate::result::{Error, Result};
 use image::{DynamicImage, GrayImage};
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::ops::AddAssign;
 use std::path::Path;
 use std::process::Command;
 use std::{collections::HashMap, hash::Hash};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,
@@ -132,13 +133,17 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
     pixels
 }
 
-pub fn average<T: Eq + Hash>(list: Vec<T>) -> T {
+pub fn average<T: Eq + Hash>(list: Vec<T>, default: T) -> T {
     let mut count = HashMap::new();
     for key in list {
         count.entry(key).or_insert(0).add_assign(1);
     }
 
-    count.into_iter().max_by_key(|&(_, c)| c).unwrap().0
+    count
+        .into_iter()
+        .max_by_key(|&(_, c)| c)
+        .unwrap_or((default, 0))
+        .0
 }
 
 pub fn log(

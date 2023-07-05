@@ -1,9 +1,7 @@
-use std::thread::sleep_ms;
-
 use crate::result::Result;
 use strsim::jaro_winkler;
+use ucd::{Codepoint, UnicodeCategory};
 use unicode_segmentation::UnicodeSegmentation;
-use ucd::{UnicodeCategory, Codepoint};
 
 const PUNCTUATION: &[UnicodeCategory] = &[
     UnicodeCategory::ConnectorPunctuation,
@@ -38,16 +36,18 @@ impl Dictionary {
             }
         }
         new
-    }    
-    
+    }
+
     fn in_dict(&self, word: &str) -> bool {
         for w in &self.words {
-            if *w == word.to_string().to_lowercase() {return true};
+            if *w == word.to_string().to_lowercase() {
+                return true;
+            };
         }
-        return false
+        return false;
     }
-    
-    fn jaro_space(&self, string:&str) -> String {
+
+    fn jaro_space(&self, string: &str) -> String {
         /*
         let length = string.len();
         for i in (1..length).rev() {
@@ -67,11 +67,11 @@ impl Dictionary {
                 }
             }
         }
-        
+
         String::new()
         */
         if self.in_dict(string) || !string.is_ascii() {
-            return String::from(string)
+            return String::from(string);
         }
         let iter: Vec<(usize, &str)> = string.grapheme_indices(true).collect();
         for (i, _) in iter.iter().rev() {
@@ -92,50 +92,50 @@ impl Dictionary {
         string.to_string()
     }
     /*
-    
-        fn get_punctuation(word: &str) -> (Vec<char>, Vec<String>) {
-            let mut splitters: Vec<char> = Vec::new();
-            let mut sequences: Vec<String> = Vec::new();
-            let mut was_last_ponct: bool = false;
-            for chr in word.chars() {
-                if PUNCTUATION.contains(&chr.category()) {
-                    if was_last_ponct {
-                        sequences.last_mut().unwrap().push(chr);
-                    } else {
-                        sequences.push(chr.to_string());
-                    }
-                    was_last_ponct = true;
-                    splitters.push(chr);
+
+    fn get_punctuation(word: &str) -> (Vec<char>, Vec<String>) {
+        let mut splitters: Vec<char> = Vec::new();
+        let mut sequences: Vec<String> = Vec::new();
+        let mut was_last_ponct: bool = false;
+        for chr in word.chars() {
+            if PUNCTUATION.contains(&chr.category()) {
+                if was_last_ponct {
+                    sequences.last_mut().unwrap().push(chr);
                 } else {
-                    was_last_ponct = false;
+                    sequences.push(chr.to_string());
                 }
+                was_last_ponct = true;
+                splitters.push(chr);
+            } else {
+                was_last_ponct = false;
             }
-            (splitters, sequences)
-        }*/
-    
+        }
+        (splitters, sequences)
+    }*/
+
     fn correct_word(&self, guess: &str) -> String {
         //if guess.chars().all(|chr| chr.is_ascii_alphabetic()) {
-            let mut best_match: String = String::new();
-            let mut best_dist: f64 = 0.;
-            for word in &self.words {
-                if (best_dist - 1.0).abs() > f64::EPSILON && word.len() == guess.len() {
-                    let dist: f64 = jaro_winkler(&guess.to_ascii_lowercase(), word);
-                    if dist > best_dist {
-                        best_dist = dist;
-                        best_match = word.clone();
-                    }
+        let mut best_match: String = String::new();
+        let mut best_dist: f64 = 0.;
+        for word in &self.words {
+            if (best_dist - 1.0).abs() > f64::EPSILON && word.len() == guess.len() {
+                let dist: f64 = jaro_winkler(&guess.to_ascii_lowercase(), word);
+                if dist > best_dist {
+                    best_dist = dist;
+                    best_match = word.clone();
                 }
             }
+        }
 
-            let iter = guess.chars().zip(best_match.chars());
-            iter.map(|(original, new)| {
-                if original.is_uppercase() {
-                    new.to_ascii_uppercase()
-                } else {
-                    new
-                }
-            })
-            .collect()
+        let iter = guess.chars().zip(best_match.chars());
+        iter.map(|(original, new)| {
+            if original.is_uppercase() {
+                new.to_ascii_uppercase()
+            } else {
+                new
+            }
+        })
+        .collect()
         //} else {
         //    String::from(guess)
         //}
@@ -172,7 +172,6 @@ impl Dictionary {
             self.correct_word(word);
         }
         words.concat()
-
     }
 
     fn correct_line(&self, line_: &String) -> String {
@@ -187,26 +186,22 @@ impl Dictionary {
             if char.len() != 1 {
                 if in_word {
                     words.last_mut().unwrap().push_str(char);
-                }
-                else {
+                } else {
                     words.push(String::from(char));
                     in_word = true;
                 }
-            }
-            else if char == " " || PUNCTUATION.contains(&char.chars().next().unwrap().category()) {
+            } else if char == " " || PUNCTUATION.contains(&char.chars().next().unwrap().category())
+            {
                 if !in_word {
                     spacing.last_mut().unwrap().push_str(char);
-                }
-                else {
+                } else {
                     spacing.push(String::from(char));
                     in_word = false;
                 }
-            }
-            else {
+            } else {
                 if in_word {
                     words.last_mut().unwrap().push_str(char);
-                }
-                else {
+                } else {
                     words.push(String::from(char));
                     in_word = true;
                 }
@@ -215,7 +210,6 @@ impl Dictionary {
         if in_word {
             spacing.push("".to_string());
         }
-
 
         let mut offset: usize = 0;
         for (i, word) in words.clone().into_iter().enumerate() {
@@ -227,11 +221,11 @@ impl Dictionary {
                 words.remove(index);
                 for new_word in new_words.rsplit(" ") {
                     words.insert(index, new_word.to_string());
-                    spacing.insert(index +1, " ".to_string());
+                    spacing.insert(index + 1, " ".to_string());
                     offset += 1;
                 }
                 offset -= 1;
-                spacing.remove(index +1);
+                spacing.remove(index + 1);
                 println!("\t{new_words}");
             }
         }
@@ -278,7 +272,7 @@ impl Dictionary {
             if cross_lines[k] > 0 {
                 while !cross_lines[k] != 0 {
                     let chr = lines[k].pop().unwrap();
-                    lines[k+1].insert(0, chr);
+                    lines[k + 1].insert(0, chr);
                     cross_lines[k] -= 1
                 }
                 lines[k].push('-');
