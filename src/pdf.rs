@@ -131,23 +131,24 @@ impl Page {
                     };
                     let sub = image::RgbaImage::from_pixel(glyph.rect.width, 2, color);
 
-                    let guess = glyph.guess.as_ref().unwrap();
-                    for x in 0..guess.rect.width {
-                        for y in 0..guess.rect.height {
-                            if guess.get_pixel(x, y) < 0.9 {
-                                let v = (255. * guess.get_pixel(x, y)) as u8;
-                                let c = match alt {
-                                    0 => Rgba([255, v, v, 255]),
-                                    1 => Rgba([v, 255, v, 255]),
-                                    2 => Rgba([v, v, 255, 255]),
-                                    3 => Rgba([255, 255, v, 255]),
-                                    _ => Rgba([v, 255, 255, 255]),
-                                };
-                                copy.put_pixel(
-                                    glyph.rect.x + x,
-                                    (line.baseline + y).saturating_add_signed(guess.offset),
-                                    c,
-                                )
+                    if let Some(guess) = &glyph.guess {
+                        for x in 0..guess.rect.width {
+                            for y in 0..guess.rect.height {
+                                if guess.get_pixel(x, y) < 0.9 {
+                                    let v = (255. * guess.get_pixel(x, y)) as u8;
+                                    let c = match alt {
+                                        0 => Rgba([255, v, v, 255]),
+                                        1 => Rgba([v, 255, v, 255]),
+                                        2 => Rgba([v, v, 255, 255]),
+                                        3 => Rgba([255, 255, v, 255]),
+                                        _ => Rgba([v, 255, 255, 255]),
+                                    };
+                                    copy.put_pixel(
+                                        glyph.rect.x + x,
+                                        (line.baseline + y).saturating_add_signed(guess.offset),
+                                        c,
+                                    )
+                                }
                             }
                         }
                     }
