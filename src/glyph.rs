@@ -344,7 +344,7 @@ impl UnknownGlyph {
         }
 
         if is_aligned && self.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
-            self.try_guess(baseline, fontbase, word_length, hint, false);
+            self.try_guess(fontbase, baseline, false, word_length, hint);
         }
     }
 }
