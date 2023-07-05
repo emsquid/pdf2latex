@@ -85,23 +85,11 @@ impl Word {
                 }
                 joined.try_guess(fontbase, baseline, true, length, None);
 
-                // if self.glyphs[base_index].guess.is_some() && self.glyphs[base_index - 1].guess.is_some() && joined.guess.is_some() {
-                //     println!("{}, {} -> {} ({} -> {})",
-                //         self.glyphs[base_index].guess.as_ref().unwrap().chr,
-                //         &self.glyphs[base_index - 1].guess.as_ref().unwrap().chr,
-                //         joined.guess.as_ref().unwrap().chr,
-                //         dist,
-                //         joined.dist.unwrap_or(f32::INFINITY)
-                //     );
-                // }
-
                 if joined.dist.unwrap_or(f32::INFINITY) < dist {
                     for _ in 0..(collapse_length + 1) {
                         self.glyphs.remove(base_index - collapse_length);
                     }
                     self.glyphs.insert(base_index - collapse_length, joined);
-                    base_index -= collapse_length;
-
                     base_index -= collapse_length;
                     continue 'outer;
                 }
