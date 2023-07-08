@@ -330,7 +330,9 @@ impl UnknownGlyph {
                             ) * bonus(&glyph.base);
                             if dist < closest {
                                 closest = dist;
-                                self.dist = Some(dist + is_aligned.then_some(0).unwrap_or(offset.abs()) as f32);
+                                self.dist = Some(
+                                    dist + is_aligned.then_some(0).unwrap_or(offset.abs()) as f32,
+                                );
                                 self.guess = Some(glyph.clone());
                             }
 
