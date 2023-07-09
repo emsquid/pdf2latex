@@ -95,7 +95,8 @@ impl Code {
     }
 
     pub fn as_path(&self) -> String {
-        format!("fonts/{self}.json")
+        let home = std::env::var("HOME").unwrap_or(String::from("~"));
+        format!("{home}/.config/pdf2latex/{self}.json")
     }
 }
 
