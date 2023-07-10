@@ -1,4 +1,3 @@
-use crate::result::Result;
 use strsim::jaro_winkler;
 use ucd::{Codepoint, UnicodeCategory};
 use unicode_segmentation::UnicodeSegmentation;
@@ -12,15 +11,16 @@ const PUNCTUATION: &[UnicodeCategory] = &[
     UnicodeCategory::OtherPunctuation,
     UnicodeCategory::OpenPunctuation,
 ];
+
 pub struct Dictionary {
     words: Vec<String>,
 }
 
 impl Dictionary {
-    pub fn new() -> Result<Dictionary> {
-        let file = std::fs::read_to_string("words.txt")?;
+    pub fn new() -> Dictionary {
+        let file = std::include_str!("words.txt");
         let words = file.lines().map(String::from).collect();
-        Ok(Dictionary { words })
+        Dictionary { words }
     }
 
     fn asc2ification(guess: &str) -> String {
@@ -76,14 +76,13 @@ impl Dictionary {
         let iter: Vec<(usize, &str)> = string.grapheme_indices(true).collect();
         for (i, _) in iter.iter().rev() {
             let (s, e) = string.split_at(*i);
-            if self.in_dict(s){
-                if self.in_dict(e){
-                    return [s,e].join(" ")
-                }
-                else {
+            if self.in_dict(s) {
+                if self.in_dict(e) {
+                    return [s, e].join(" ");
+                } else {
                     let ne = self.jaro_space(e);
-                    if ne != e{
-                        return [s, &ne].join(" ")
+                    if ne != e {
+                        return [s, &ne].join(" ");
                     }
                 }
             }

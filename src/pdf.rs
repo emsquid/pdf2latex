@@ -7,10 +7,9 @@ use crate::text::Line;
 use crate::utils::{find_parts, log, pdf_to_images, Rect};
 use image::imageops::overlay;
 use image::{DynamicImage, GenericImage, Rgba};
-use std::collections::btree_map::Iter;
 use std::io::Write;
 use std::path::Path;
-use std::{default, time};
+use std::time;
 
 const LINE_SPACING: u32 = 10;
 
@@ -130,7 +129,7 @@ impl Page {
                         _ => Rgba([0, 255, 255, 255]),
                     };
                     let sub = image::RgbaImage::from_pixel(glyph.rect.width, 2, color);
-                    
+
                     if let Some(guess) = &glyph.guess {
                         for x in 0..guess.rect.width {
                             for y in 0..guess.rect.height {
@@ -208,8 +207,8 @@ impl Pdf {
         Ok(())
     }
 
-    pub fn get_content(&self) -> Result<String> {
-        let dictionary = Dictionary::new()?;
+    pub fn get_content(&self) -> String {
+        let dictionary = Dictionary::new();
         let content = self
             .pages
             .iter()
@@ -217,21 +216,20 @@ impl Pdf {
             .collect::<Vec<String>>()
             .join("\n");
 
-        //Ok(dictionary.correct_text(content))
-        Ok(content)
+        //dictionary.correct_text(content)
+        content
     }
 
-    pub fn debug_content(&self) -> Result<String> {
-        Ok(self
-            .pages
+    pub fn debug_content(&self) -> String {
+        self.pages
             .iter()
             .map(|page| page.debug_content())
             .collect::<Vec<String>>()
-            .join("\n"))
+            .join("\n")
     }
 
     pub fn save_content(&self, path: &Path) -> Result<()> {
-        std::fs::write(path, self.get_content()?)?;
+        std::fs::write(path, self.get_content())?;
 
         Ok(())
     }

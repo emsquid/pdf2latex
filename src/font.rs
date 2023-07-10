@@ -95,7 +95,8 @@ impl Code {
     }
 
     pub fn as_path(&self) -> String {
-        format!("fonts/{self}.json")
+        let home = std::env::var("HOME").unwrap_or(String::from("~"));
+        format!("{home}/.config/pdf2latex/{self}.json")
     }
 }
 
@@ -334,6 +335,8 @@ impl FontBase {
     }
 
     fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
+        log(&format!("loading font {code}"), Some(0.), None, "s")?;
+
         let mut family = HashMap::new();
         for glyph in Self::get_family(code)? {
             family
@@ -341,6 +344,9 @@ impl FontBase {
                 .or_insert(Vec::new())
                 .push(glyph);
         }
+
+        log(&format!("loaded font {code}"), Some(1.), None, "u")?;
+        std::io::stdout().write_all(b"\n")?;
 
         Ok(family)
     }
