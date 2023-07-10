@@ -27,6 +27,7 @@ pdf2latex super_cool.pdf -o cooler.tex
 
 - The project currently requires `json` font files to recognize characters, ask us! 
   These files should be placed in the following directories
+  
   |Platform | Value                                 | Example                                  |
   | ------- | ------------------------------------- | ---------------------------------------- |
   | Linux   | `$XDG_CONFIG_HOME` or `$HOME`/.config | /home/alice/.config                      |
