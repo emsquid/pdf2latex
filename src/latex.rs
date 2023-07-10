@@ -28,13 +28,14 @@ impl Latex {
 
         let mut content = String::from(
             "\\documentclass{article}".to_owned()
-                + "\n\\title{LE TITRE !!!}"
                 + "\n\\author{pdf2latex}"
                 + "\n\\date{}"
                 + "\n\\usepackage{geometry}"
                 + "\n\\geometry{margin="
                 + (margin * 96 / 300).to_string().as_str()
-                + "in, top=0.7in}"
+                + "in, top="
+                + (self.pdf.pages[0].lines[0].rect.y).to_string().as_str()
+                + "0.7in}"
                 + "\n\\usepackage{amsmath}"
                 + "\n\\begin{document}",
         );
