@@ -15,9 +15,9 @@ pub struct Args {
 
     /// Create font files
     #[arg(short, long, value_enum)]
-    pub create: Option<Vec<Code>>,
+    pub create: Option<Code>,
 
-    /// Silent mode
+    /// Verbose mode
     #[arg(short, long, default_value_t = false)]
-    pub silent: bool,
+    pub verbose: bool,
 }

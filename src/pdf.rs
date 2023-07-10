@@ -41,7 +41,7 @@ impl Page {
             let mut progress = 0.;
             let step = 1. / self.lines.len() as f32;
 
-            if !args.silent {
+            if args.verbose {
                 log("creating threads", Some(0.), None, "s")?;
             }
 
@@ -51,20 +51,20 @@ impl Page {
                 handles.push(handle);
 
                 progress += step;
-                if !args.silent {
+                if args.verbose {
                     log("creating threads", Some(progress), None, "u")?;
                 }
             }
 
             let duration = now.elapsed().as_secs_f32();
-            if !args.silent {
+            if args.verbose {
                 log("creating threads", Some(1.), Some(duration), "u")?;
             }
 
             now = time::Instant::now();
             progress = 0.;
 
-            if !args.silent {
+            if args.verbose {
                 std::io::stdout().write_all(b"\n\x1b[s")?;
                 log("converting text", Some(0.), None, "u")?;
             }
@@ -73,13 +73,13 @@ impl Page {
                 handle.join().unwrap();
 
                 progress += step;
-                if !args.silent {
+                if args.verbose {
                     log("converting text", Some(progress), None, "u")?;
                 }
             }
 
             let duration = now.elapsed().as_secs_f32();
-            if !args.silent {
+            if args.verbose {
                 log("converting text", Some(1.), Some(duration), "u")?;
                 std::io::stdout().write_all(b"\n")?;
             }
@@ -143,7 +143,8 @@ impl Page {
                                     };
                                     copy.put_pixel(
                                         glyph.rect.x + x,
-                                        (line.baseline + y - glyph.rect.height).saturating_add_signed(guess.offset),
+                                        (line.baseline + y - glyph.rect.height)
+                                            .saturating_add_signed(guess.offset),
                                         c,
                                     )
                                 }
@@ -196,7 +197,7 @@ impl Pdf {
         let fontbase = FontBase::new(args)?;
 
         for (i, page) in self.pages.iter_mut().enumerate() {
-            if !args.silent {
+            if args.verbose {
                 log(&format!("\nPAGE {i}\n"), None, None, "1m")?;
             }
 

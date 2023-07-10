@@ -13,8 +13,20 @@ const ALPHABET: &str = "abcdefghijklmnopqrstuvwxyz";
 const PUNCTUATIONS: &[&str] = &[
     ".", ",", ";", ":", "!", "?", "'", "\"", "-", "--", "---", "(", ")", "\\{", "\\}", "[", "]",
 ];
-const LIGATURES: &[&str] = &["ff", "fi", "fl", "ffi", "ffl", "ae"];
-const ACCENTS: &[&str] = &["overline", "vec", "overrightarrow", "widehat", "widetilde"];
+const LIGATURES: &[&str] = &["ff", "fi", "fl", "ffi", "ffl", "\\ae", "\\oe"];
+const ACCENTS: &[&str] = &["'", "`", "\"", "."];
+const MATH_ACCENTS: &[&str] = &[
+    "acute",
+    "grave",
+    "overline",
+    "vec",
+    "overrightarrow",
+    "overleftarrow",
+    "hat",
+    "widehat",
+    "tilde",
+    "widetilde",
+];
 const GREEKS: &[&str] = &[
     "alpha",
     "beta",
@@ -238,23 +250,21 @@ impl FontBase {
     pub fn new(args: &Args) -> Result<FontBase> {
         let now = time::Instant::now();
 
-        if !args.silent {
+        if args.verbose {
             log("LOADING FONTS\n", None, None, "1m")?;
         }
 
-        if let Some(codes) = &args.create {
-            for code in codes {
-                Self::create_family(*code)?;
-            }
+        if let Some(code) = args.create {
+            Self::create_family(code, args)?;
         }
 
         let mut glyphs = HashMap::new();
         for code in Code::all() {
-            glyphs.insert(code, Self::load_family(code)?);
+            glyphs.insert(code, Self::load_family(code, args)?);
         }
 
         let duration = now.elapsed().as_secs_f32();
-        if !args.silent {
+        if args.verbose {
             log("LOADED FONTS", None, Some(duration), "1m")?;
             std::io::stdout().write_all(b"\n")?;
         }
@@ -272,11 +282,13 @@ impl FontBase {
         }
     }
 
-    fn create_family(code: Code) -> Result<()> {
+    fn create_family(code: Code, args: &Args) -> Result<()> {
         std::thread::scope(|scope| -> Result<()> {
             std::fs::create_dir_all("temp")?;
 
-            log(&format!("creating font {code}"), Some(0.), None, "s")?;
+            if args.verbose {
+                log(&format!("creating font {code}"), Some(0.), None, "s")?;
+            }
 
             let mut id = 0;
             let mut handles = Vec::new();
@@ -306,12 +318,14 @@ impl FontBase {
                             glyphs.push(glyph);
                         }
 
-                        log(
-                            &format!("creating font {code}"),
-                            Some(id as f32 / count as f32),
-                            None,
-                            "u",
-                        )?;
+                        if args.verbose {
+                            log(
+                                &format!("creating font {code}"),
+                                Some(id as f32 / count as f32),
+                                None,
+                                "u",
+                            )?;
+                        }
                         id += 1;
                     }
                 }
@@ -322,8 +336,10 @@ impl FontBase {
                 glyphs.push(glyph);
             }
 
-            log(&format!("created font {code}"), Some(1.), None, "u")?;
-            std::io::stdout().write_all(b"\n")?;
+            if args.verbose {
+                log(&format!("created font {code}"), Some(1.), None, "u")?;
+                std::io::stdout().write_all(b"\n")?;
+            }
 
             let json = serde_json::to_string(&glyphs)?;
             std::fs::write(code.as_path(), json)?;
@@ -335,8 +351,10 @@ impl FontBase {
         Ok(())
     }
 
-    fn load_family(code: Code) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
-        log(&format!("loading font {code}"), Some(0.), None, "s")?;
+    fn load_family(code: Code, args: &Args) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
+        if args.verbose {
+            log(&format!("loading font {code}"), Some(0.), None, "s")?;
+        }
 
         let mut family = HashMap::new();
         for glyph in Self::get_family(code)? {
@@ -346,8 +364,10 @@ impl FontBase {
                 .push(glyph);
         }
 
-        log(&format!("loaded font {code}"), Some(1.), None, "u")?;
-        std::io::stdout().write_all(b"\n")?;
+        if args.verbose {
+            log(&format!("loaded font {code}"), Some(1.), None, "u")?;
+            std::io::stdout().write_all(b"\n")?;
+        }
 
         Ok(family)
     }
@@ -380,6 +400,30 @@ impl FontBase {
     fn generate_accents() -> Vec<(String, Vec<Size>, Vec<Style>, Vec<String>, bool)> {
         let mut symbols = Vec::new();
         for accent in ACCENTS {
+            for chr in ALPHABET.chars() {
+                symbols.push((
+                    chr.to_lowercase().to_string(),
+                    Size::all(),
+                    Style::text(),
+                    vec![accent.to_string()],
+                    false,
+                ));
+                symbols.push((
+                    chr.to_uppercase().to_string(),
+                    Size::all(),
+                    Style::text(),
+                    vec![accent.to_string()],
+                    false,
+                ));
+            }
+        }
+
+        symbols
+    }
+
+    fn generate_math_accents() -> Vec<(String, Vec<Size>, Vec<Style>, Vec<String>, bool)> {
+        let mut symbols = Vec::new();
+        for accent in MATH_ACCENTS {
             for chr in ALPHABET.chars() {
                 symbols.push((
                     chr.to_lowercase().to_string(),
@@ -440,6 +484,7 @@ impl FontBase {
         symbols.extend(Self::generate_ligatures());
         symbols.extend(Self::generate_punctuations());
         symbols.extend(Self::generate_accents());
+        symbols.extend(Self::generate_math_accents());
         symbols.extend(Self::generate_greek());
 
         let count = symbols.iter().map(|d| d.1.len() * d.2.len()).sum();
