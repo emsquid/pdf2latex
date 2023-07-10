@@ -145,7 +145,7 @@ impl Page {
                                     };
                                     copy.put_pixel(
                                         glyph.rect.x + x,
-                                        (line.baseline + y).saturating_add_signed(guess.offset),
+                                        (line.baseline + y - glyph.rect.height).saturating_add_signed(guess.offset),
                                         c,
                                     )
                                 }
