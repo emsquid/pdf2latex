@@ -6,6 +6,7 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Write;
+use std::path::PathBuf;
 use std::time;
 
 const ALPHABET: &str = "abcdefghijklmnopqrstuvwxyz";
@@ -95,8 +96,8 @@ impl Code {
     }
 
     pub fn as_path(&self) -> String {
-        let home = std::env::var("HOME").unwrap_or(String::from("~"));
-        format!("{home}/.config/pdf2latex/{self}.json")
+        let config = dirs::config_dir().unwrap_or(PathBuf::from("~/.config"));
+        format!("{}/pdf2latex/{self}.json", config.display())
     }
 }
 

@@ -1,5 +1,4 @@
 use crate::args::Args;
-use crate::dictionary::Dictionary;
 use crate::font::FontBase;
 use crate::glyph::Glyph;
 use crate::result::Result;
@@ -208,7 +207,6 @@ impl Pdf {
     }
 
     pub fn get_content(&self) -> String {
-        let dictionary = Dictionary::new();
         let content = self
             .pages
             .iter()
@@ -216,7 +214,6 @@ impl Pdf {
             .collect::<Vec<String>>()
             .join("\n");
 
-        //dictionary.correct_text(content)
         content
     }
 

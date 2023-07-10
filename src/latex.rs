@@ -1,4 +1,3 @@
-use crate::dictionary::Dictionary;
 use crate::{pdf::Pdf, result::Result};
 use std::{fs::File, io::Write};
 

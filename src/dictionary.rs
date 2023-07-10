@@ -1,17 +1,7 @@
 use strsim::jaro_winkler;
-use ucd::{Codepoint, UnicodeCategory};
 use unicode_segmentation::UnicodeSegmentation;
 
-const PUNCTUATION: &[UnicodeCategory] = &[
-    UnicodeCategory::ConnectorPunctuation,
-    UnicodeCategory::DashPunctuation,
-    UnicodeCategory::ClosePunctuation,
-    UnicodeCategory::FinalPunctuation,
-    UnicodeCategory::InitialPunctuation,
-    UnicodeCategory::OtherPunctuation,
-    UnicodeCategory::OpenPunctuation,
-];
-
+/*
 pub struct Dictionary {
     words: Vec<String>,
 }
@@ -282,3 +272,4 @@ impl Dictionary {
         lines.join("\n")
     }
 }
+*/
