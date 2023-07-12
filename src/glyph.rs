@@ -185,6 +185,10 @@ impl KnownGlyph {
     pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, math: &mut bool, init: &mut bool) -> String {
         let mut text = "".to_string();
 
+        if !self.math && *math {
+            *math = self.math;
+            text.push('$');
+        }
         if current_size != &self.size || *init
         {
             if !*init {
@@ -233,7 +237,7 @@ impl KnownGlyph {
                 }
             }
         // }
-        if self.math != *math {
+        if self.math && !*math {
             *math = self.math;
             text.push('$');
         }

@@ -53,8 +53,6 @@ impl Latex {
         }
         content.push_str("\n\\end{document}");
 
-        println!("{content}");
-
         file.write_all(content.as_bytes())?;
 
         Ok(())
