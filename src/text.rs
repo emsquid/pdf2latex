@@ -141,7 +141,7 @@ impl Word {
         self.glyphs
             .iter()
             .map(|glyph| match &glyph.guess {
-                Some(guess) => KnownGlyph::latex(&guess.base, guess.size, guess.style, guess.modifiers.clone(), guess.math),
+                Some(guess) => guess.base.to_owned(),
                 None => '\u{2584}'.to_string(),
             })
             .collect()

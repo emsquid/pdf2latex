@@ -193,14 +193,12 @@ impl KnownGlyph {
         {
             if !*init {
                 for style in current_styles.iter().rev() {
-                    println!("closing {style}");
                     if Style::math().contains(style) {
                         text.push_str("}$");
                     } else {
                         text.push_str("}");
                     }
                 }
-                println!("closing {current_size}");
                 text.push_str("}");
             }
             current_styles.clear();
@@ -212,7 +210,6 @@ impl KnownGlyph {
         while i < current_styles.len() {
             // if !self.style.contains(&current_styles[i]) {
             if self.style != current_styles[i] {
-                println!("closing {}", current_styles[i]);
                 if Style::math().contains(&current_styles[i]) {
                     text.push_str("}$");
                 } else {
