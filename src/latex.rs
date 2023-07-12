@@ -1,4 +1,4 @@
-use crate::{pdf::Pdf, result::Result, font::Size};
+use crate::{pdf::Pdf, result::Result, font::{Size, Style}};
 use std::{fs::File, io::Write};
 use crate::utils::round;
 
@@ -42,13 +42,23 @@ impl Latex {
         );
         for page in &self.pdf.pages {
             let mut init = true;
-            let mut math = true;
+            let mut math = false;
             let mut current_size = Size::Normalsize;
             let mut current_styles = Vec::new();
             for line in &page.lines {
                 content.push_str("\n    ");
 
                 content.push_str(&line.get_latex(&mut current_size, &mut current_styles, &mut math, &mut init));
+            }
+            for style in current_styles {
+                if Style::math().contains(&style) {
+                    content.push_str("}$");
+                } else {
+                    content.push_str("}");
+                }
+            }
+            if math {
+                content.push('$');
             }
         }
         content.push_str("\n\\end{document}");
