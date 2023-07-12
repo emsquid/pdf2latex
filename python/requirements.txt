@@ -1,4 +1,0 @@
-numpy==1.24.3
-numexpr==2.8.4
-Pillow==9.5.0
-pdf2image==1.16.3
