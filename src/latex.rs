@@ -1,4 +1,4 @@
-use crate::{pdf::Pdf, result::Result};
+use crate::{pdf::Pdf, result::Result, font::Size};
 use std::{fs::File, io::Write};
 
 pub struct Latex {
@@ -40,18 +40,13 @@ impl Latex {
                 + "\n\\begin{document}",
         );
         for page in &self.pdf.pages {
+            let mut init = true;
+            let mut current_size = Size::Normalsize;
+            let mut current_styles = Vec::new();
             for line in &page.lines {
                 content.push_str("\n    ");
 
-                content.push_str(&String::from_iter(line.get_content().char_indices().map(
-                    |c| {
-                        if c.1.is_ascii() {
-                            c.1
-                        } else {
-                            '?'
-                        }
-                    },
-                )));
+                content.push_str(&line.get_latex(&mut current_size, &mut current_styles, &mut init));
             }
         }
         content.push_str("\n\\end{document}");

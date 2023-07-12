@@ -88,10 +88,10 @@ impl Code {
             Code::Cmr,
             Code::Lmr,
             Code::Put,
-            Code::Qag,
-            Code::Qcr,
+            // Code::Qag,
+            // Code::Qcr,
             // Code::Qcs,
-            Code::Qpl,
+            // Code::Qpl,
         ]
     }
 

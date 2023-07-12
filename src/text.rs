@@ -146,6 +146,12 @@ impl Word {
             })
             .collect()
     }
+    pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, init: &mut bool) -> String {
+        self.glyphs
+            .iter()
+            .map(|glyph| glyph.guess.clone().unwrap().get_latex(current_size, current_styles, init))
+            .collect()
+    }
 
     pub fn debug_content(&self) -> String {
         self.glyphs
@@ -244,6 +250,13 @@ impl Line {
         self.words
             .iter()
             .map(|word| word.get_content())
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
+    pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, init: &mut bool) -> String {
+        self.words
+            .iter()
+            .map(|word| word.get_latex(current_size, current_styles, init))
             .collect::<Vec<String>>()
             .join(" ")
     }

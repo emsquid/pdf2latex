@@ -1,8 +1,9 @@
 use crate::font::{Code, FontBase, Size, Style};
-use crate::result::{Error, Result};
+use crate::result::{Error, Result, self};
 use crate::utils::{find_parts, flood_fill, Rect};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 use serde::{Deserialize, Serialize};
+use std::arch::x86_64::_XCR_XFEATURE_ENABLED_MASK;
 use std::collections::HashMap;
 use std::process::Command;
 
@@ -180,6 +181,66 @@ impl KnownGlyph {
             .fold(base.to_string(), |acc, modif| format!("\\{modif}{{{acc}}}"));
         base = if math { format!("${base}$") } else { base };
         size.apply(style.apply(base))
+    }
+    pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, init: &mut bool) -> String {
+        let mut text = "".to_string();
+
+        if current_size != &self.size || *init
+        {
+            if !*init {
+                for style in current_styles.iter().rev() {
+                    println!("closing {style}");
+                    if Style::math().contains(style) {
+                        text.push_str("}$");
+                    } else {
+                        text.push_str("}");
+                    }
+                }
+                println!("closing {current_size}");
+                text.push_str("}");
+            }
+            current_styles.clear();
+            *current_size = self.size;
+            text.push_str(format!("\\{}{{", self.size).as_str());
+        }
+        
+        let mut i = 0;
+        while i < current_styles.len() {
+            // if !self.style.contains(&current_styles[i]) {
+            if self.style != current_styles[i] {
+                println!("closing {}", current_styles[i]);
+                if Style::math().contains(&current_styles[i]) {
+                    text.push_str("}$");
+                } else {
+                    text.push_str("}");
+                }
+
+                current_styles.remove(i);
+            }
+            else {
+                i += 1;
+            }
+        }
+        let style = self.style;
+        // for style in self.style {
+            if !current_styles.contains(&style) {
+                current_styles.push(style);
+
+                if Style::math().contains(&style) {
+                    text.push_str(format!("$\\{}{{", style).as_str());
+                } else {
+                    text.push_str(format!("\\{}{{", style).as_str());
+                }
+            }
+        // }
+        let base = self.modifiers
+            .iter()
+            .fold(self.base.clone(), |acc, modif| format!("\\{modif}{{{acc}}}"));
+
+        text.push_str(&base);
+
+        *init = false;
+        text
     }
 
     fn find_baseline(image: &DynamicImage) -> u32 {
