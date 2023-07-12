@@ -1,5 +1,6 @@
 use crate::{pdf::Pdf, result::Result, font::Size};
 use std::{fs::File, io::Write};
+use crate::utils::round;
 
 pub struct Latex {
     pub pdf: Pdf,
@@ -32,9 +33,9 @@ impl Latex {
                 + "\n\\date{}"
                 + "\n\\usepackage{geometry}"
                 + "\n\\geometry{margin="
-                + (margin * 96 / 300).to_string().as_str()
+                + &(round(margin as f32 /512.,2)).to_string()
                 + "in, top="
-                + (self.pdf.pages[0].lines[0].rect.y).to_string().as_str()
+                // + &(self.pdf.pages[0].lines[0].rect.y).to_string()
                 + "0.7in}"
                 + "\n\\usepackage{amsmath}"
                 + "\n\\begin{document}",
@@ -50,6 +51,8 @@ impl Latex {
             }
         }
         content.push_str("\n\\end{document}");
+
+        println!("{content}");
 
         file.write_all(content.as_bytes())?;
 
