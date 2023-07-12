@@ -182,7 +182,7 @@ impl KnownGlyph {
         base = if math { format!("${base}$") } else { base };
         size.apply(style.apply(base))
     }
-    pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, init: &mut bool) -> String {
+    pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, math: &mut bool, init: &mut bool) -> String {
         let mut text = "".to_string();
 
         if current_size != &self.size || *init
@@ -233,6 +233,10 @@ impl KnownGlyph {
                 }
             }
         // }
+        if self.math != *math {
+            *math = self.math;
+            text.push('$');
+        }
         let base = self.modifiers
             .iter()
             .fold(self.base.clone(), |acc, modif| format!("\\{modif}{{{acc}}}"));
