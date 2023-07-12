@@ -174,7 +174,7 @@ impl KnownGlyph {
         }
     }
 
-    fn latex(base: &str, size: Size, style: Style, modifiers: Vec<String>, math: bool) -> String {
+    pub fn latex(base: &str, size: Size, style: Style, modifiers: Vec<String>, math: bool) -> String {
         let mut base = modifiers
             .iter()
             .fold(base.to_string(), |acc, modif| format!("\\{modif}{{{acc}}}"));

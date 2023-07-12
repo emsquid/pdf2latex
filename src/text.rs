@@ -1,5 +1,5 @@
 use crate::font::{Code, FontBase, Size, Style};
-use crate::glyph::{Glyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD};
+use crate::glyph::{Glyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD, KnownGlyph};
 use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
@@ -141,7 +141,7 @@ impl Word {
         self.glyphs
             .iter()
             .map(|glyph| match &glyph.guess {
-                Some(guess) => guess.base.clone(),
+                Some(guess) => KnownGlyph::latex(&guess.base, guess.size, guess.style, guess.modifiers.clone(), guess.math),
                 None => '\u{2584}'.to_string(),
             })
             .collect()
