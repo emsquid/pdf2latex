@@ -6,7 +6,7 @@ use clap::ValueEnum;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
-use std::time;
+use std::{time, vec};
 
 const ALPHABET: &str = "abcdefghijklmnopqrstuvwxyz";
 
@@ -119,8 +119,12 @@ impl Size {
         .to_string()
     }
 
-    pub fn apply(&self, symbol: String) -> String {
-        format!("\\{self}{{{symbol}}}")
+    pub fn apply(&self, base: String) -> String {
+        if self == &Self::Normalsize {
+            base
+        } else {
+            format!("\\{self}{{{base}}}")
+        }
     }
 }
 
@@ -161,7 +165,9 @@ impl Style {
             vec![Style::Normal],
             vec![Style::Bold],
             vec![Style::Italic],
+            vec![Style::Slanted],
             vec![Style::Bold, Style::Italic],
+            vec![Style::Bold, Style::Slanted],
             vec![Style::SansSerif],
             vec![Style::BlackBoard],
             vec![Style::Calligraphic],
@@ -175,8 +181,9 @@ impl Style {
             vec![Style::Normal],
             vec![Style::Bold],
             vec![Style::Italic],
-            vec![Style::Bold, Style::Italic],
             vec![Style::Slanted],
+            vec![Style::Bold, Style::Italic],
+            vec![Style::Bold, Style::Slanted],
             vec![Style::SansSerif],
         ]
     }
@@ -209,6 +216,7 @@ impl Style {
     }
 }
 
+type GlyphData = (String, Vec<Vec<Style>>, Vec<String>, bool);
 pub struct FontBase {
     pub glyphs: HashMap<Code, HashMap<(u32, u32), Vec<KnownGlyph>>>,
 }
@@ -283,7 +291,7 @@ impl FontBase {
                             KnownGlyph::from(&t_base, code, size, style, t_modifiers, math, id)
                         }));
 
-                        if handles.len() >= 3 {
+                        if handles.len() >= 8 {
                             let glyph = handles.remove(0).join().unwrap()?;
                             glyphs.push(glyph);
 
@@ -348,11 +356,23 @@ impl FontBase {
         Ok(family)
     }
 
-    fn generate_alphanumeric() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_alphanumeric() -> Vec<GlyphData> {
         let mut symbols = Vec::new();
         for chr in ALPHABET.chars() {
             symbols.push((chr.to_lowercase().to_string(), Style::text(), vec![], false));
             symbols.push((chr.to_uppercase().to_string(), Style::all(), vec![], false));
+            symbols.push((
+                chr.to_lowercase().to_string(),
+                vec![vec![Style::Normal]],
+                vec![],
+                true,
+            ));
+            symbols.push((
+                chr.to_uppercase().to_string(),
+                vec![vec![Style::Normal]],
+                vec![],
+                true,
+            ));
         }
         for n in 0..10 {
             symbols.push((n.to_string(), Style::text(), vec![], false));
@@ -361,7 +381,7 @@ impl FontBase {
         symbols
     }
 
-    fn generate_accents() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_accents() -> Vec<GlyphData> {
         let mut symbols = Vec::new();
         for accent in include_str!("data/accents.txt").lines() {
             for chr in ALPHABET.chars() {
@@ -383,7 +403,7 @@ impl FontBase {
         symbols
     }
 
-    fn generate_math_accents() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_math_accents() -> Vec<GlyphData> {
         let mut symbols = Vec::new();
         for accent in include_str!("data/math_accents.txt").lines() {
             for chr in ALPHABET.chars() {
@@ -405,28 +425,33 @@ impl FontBase {
         symbols
     }
 
-    fn generate_punctuations() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_punctuations() -> Vec<GlyphData> {
         include_str!("data/punctuations.txt")
             .lines()
-            .map(|punct| (punct.to_string(), Style::text(), vec![], false))
+            .flat_map(|punct| {
+                [
+                    (punct.to_string(), Style::text(), vec![], false),
+                    (punct.to_string(), vec![vec![Style::Normal]], vec![], true),
+                ]
+            })
             .collect()
     }
 
-    fn generate_ligatures() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_ligatures() -> Vec<GlyphData> {
         include_str!("data/ligatures.txt")
             .lines()
             .map(|lig| (lig.to_string(), Style::text(), vec![], false))
             .collect()
     }
 
-    fn generate_greeks() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_greeks() -> Vec<GlyphData> {
         include_str!("data/greeks.txt")
             .lines()
             .map(|greek| (greek.to_string(), vec![vec![Style::Normal]], vec![], true))
             .collect()
     }
 
-    fn generate_constructs() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_constructs() -> Vec<GlyphData> {
         let mut symbols = Vec::new();
         for construct in include_str!("data/constructs.txt").lines() {
             for chr in ALPHABET.chars() {
@@ -448,28 +473,28 @@ impl FontBase {
         symbols
     }
 
-    fn generate_arrows() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_arrows() -> Vec<GlyphData> {
         include_str!("data/arrows.txt")
             .lines()
             .map(|arrow| (arrow.to_string(), vec![vec![Style::Normal]], vec![], true))
             .collect()
     }
 
-    fn generate_operations() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_operations() -> Vec<GlyphData> {
         include_str!("data/operations.txt")
             .lines()
             .map(|op| (op.to_string(), vec![vec![Style::Normal]], vec![], true))
             .collect()
     }
 
-    fn generate_misc() -> Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)> {
+    fn generate_misc() -> Vec<GlyphData> {
         include_str!("data/miscellaneous.txt")
             .lines()
             .map(|misc| (misc.to_string(), vec![vec![Style::Normal]], vec![], true))
             .collect()
     }
 
-    fn generate_symbols() -> (Vec<(String, Vec<Vec<Style>>, Vec<String>, bool)>, usize) {
+    fn generate_symbols() -> (Vec<GlyphData>, usize) {
         let mut symbols = Vec::new();
 
         symbols.extend(Self::generate_alphanumeric());

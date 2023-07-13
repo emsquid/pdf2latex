@@ -175,6 +175,6 @@ pub fn log(
     Ok(())
 }
 
-pub fn round(n: f32, precision: u32) -> f32 {
-    (n * (10.0_f32).powi(precision as i32)).round() / 10.0_f32.powi(precision as i32)
+pub fn round(value: f32, digits: u32) -> f32 {
+    (value * (10.0_f32).powi(digits as i32)).round() / 10.0_f32.powi(digits as i32)
 }

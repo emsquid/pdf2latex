@@ -1,7 +1,6 @@
 use clap::Parser;
 
 mod args;
-mod dictionary;
 mod font;
 mod glyph;
 mod latex;
@@ -15,14 +14,11 @@ fn process(args: &args::Args) -> result::Result<()> {
 
     pdf.guess(args)?;
     match &args.output {
-        Some(output) => pdf.save_content(output)?,
-        None => println!("\n{}", pdf.get_content()),
+        Some(output) => latex::Latex::from(&pdf).save(output)?,
+        None => println!("{}", pdf.get_content()),
     }
     pdf.pages[0].debug_dist_avg();
     pdf.pages[0].debug_image().save("./test/debug.png")?;
-
-    let latex = latex::Latex::from(pdf);
-    latex.save("test/test.tex")?;
 
     Ok(())
 }

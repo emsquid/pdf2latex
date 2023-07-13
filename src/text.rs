@@ -1,5 +1,5 @@
 use crate::font::{Code, FontBase, Size, Style};
-use crate::glyph::{Glyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD, KnownGlyph};
+use crate::glyph::{Glyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD};
 use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
@@ -56,10 +56,8 @@ impl Word {
     }
 
     pub fn guess(&mut self, fontbase: &FontBase, baseline: u32) {
-        let length = self.glyphs.len();
-
         for glyph in &mut self.glyphs {
-            glyph.try_guess(fontbase, baseline, true, length, None);
+            glyph.try_guess(fontbase, baseline, true, None);
         }
 
         let mut base_index: usize = self.glyphs.len();
@@ -83,7 +81,7 @@ impl Word {
                 for i in 2..=collapse_length {
                     joined = joined.join(&self.glyphs[base_index - i]);
                 }
-                joined.try_guess(fontbase, baseline, true, length, None);
+                joined.try_guess(fontbase, baseline, true, None);
 
                 if joined.dist.unwrap_or(f32::INFINITY) < dist {
                     for _ in 0..(collapse_length + 1) {
@@ -98,43 +96,9 @@ impl Word {
 
         for glyph in &mut self.glyphs {
             if glyph.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
-                glyph.try_guess(fontbase, baseline, false, length, None);
+                glyph.try_guess(fontbase, baseline, false, None);
             }
         }
-    }
-
-    pub fn correct_guess(&mut self, fontbase: &FontBase, baseline: u32, code: Code) {
-        let length = self.glyphs.len();
-
-        for glyph in &mut self.glyphs {
-            glyph.try_guess(
-                fontbase,
-                baseline,
-                true,
-                length,
-                Some((code, Size::Normalsize)),
-            );
-        }
-    }
-
-    pub fn get_code(&self) -> Option<Code> {
-        let codes = self
-            .glyphs
-            .iter()
-            .map(|glyph| glyph.guess.clone().map(|guess| guess.code))
-            .collect();
-
-        average(codes, Some(Code::Lmr))
-    }
-
-    pub fn get_size(&self) -> Option<Size> {
-        let sizes = self
-            .glyphs
-            .iter()
-            .map(|glyph| glyph.guess.clone().map(|guess| guess.size))
-            .collect();
-
-        average(sizes, Some(Size::Normalsize))
     }
 
     pub fn get_content(&self) -> String {
@@ -146,38 +110,22 @@ impl Word {
             })
             .collect()
     }
-    pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, math: &mut bool, init: &mut bool) -> String {
-        self.glyphs
-            .iter()
-            .map(|glyph| glyph.guess.clone().unwrap().get_latex(current_size, current_styles, math, init))
-            .collect()
-    }
 
-    pub fn debug_content(&self) -> String {
+    pub fn get_latex(
+        &self,
+        size: &mut Size,
+        styles: &mut Vec<Style>,
+        math: &mut bool,
+        init: &mut bool,
+    ) -> String {
         self.glyphs
             .iter()
             .map(|glyph| {
-                let mut content = String::new();
-                if let Some(guess) = &glyph.guess {
-                    if !guess.base.is_ascii() {
-                        content.push_str("\x1b[31m");
-                    }
-                    if guess.styles.contains(&Style::Bold) {
-                        content.push_str("\x1b[1;32m");
-                    }
-                    if guess.styles.contains(&Style::Italic) {
-                        content.push_str("\x1b[3;34m");
-                    }
-                    if guess.styles.contains(&Style::Slanted) {
-                        content.push_str("\x1b[3;35m");
-                    }
-                    content.push_str(&guess.base);
-                } else {
-                    content.push_str("\x1b[33m");
-                    content.push('\u{2584}');
-                }
-                content.push_str("\x1b[0m");
-                content
+                glyph
+                    .guess
+                    .clone()
+                    .map(|known| known.get_latex(size, styles, math, init))
+                    .unwrap_or(String::from("?"))
             })
             .collect()
     }
@@ -226,20 +174,6 @@ impl Line {
         }
     }
 
-    pub fn get_code(&self) -> Option<Code> {
-        let codes = self
-            .words
-            .iter()
-            .flat_map(|word| {
-                word.glyphs
-                    .iter()
-                    .map(|glyph| glyph.guess.clone().map(|guess| guess.code))
-            })
-            .collect();
-
-        average(codes, Some(Code::Lmr))
-    }
-
     pub fn guess(&mut self, fontbase: &FontBase) {
         for word in &mut self.words {
             word.guess(fontbase, self.baseline);
@@ -253,18 +187,16 @@ impl Line {
             .collect::<Vec<String>>()
             .join(" ")
     }
-    pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, math: &mut bool, init: &mut bool) -> String {
+    pub fn get_latex(
+        &self,
+        size: &mut Size,
+        styles: &mut Vec<Style>,
+        math: &mut bool,
+        init: &mut bool,
+    ) -> String {
         self.words
             .iter()
-            .map(|word| word.get_latex(current_size, current_styles, math, init))
-            .collect::<Vec<String>>()
-            .join(" ")
-    }
-
-    pub fn debug_content(&self) -> String {
-        self.words
-            .iter()
-            .map(|word| word.debug_content())
+            .map(|word| word.get_latex(size, styles, math, init))
             .collect::<Vec<String>>()
             .join(" ")
     }

@@ -96,14 +96,6 @@ impl Page {
             .join("\n")
     }
 
-    pub fn debug_content(&self) -> String {
-        self.lines
-            .iter()
-            .map(|line| line.debug_content())
-            .collect::<Vec<String>>()
-            .join("\n")
-    }
-
     pub fn debug_image(&self) -> DynamicImage {
         let mut copy = self.image.clone();
         let mut alt = 0;
@@ -204,6 +196,10 @@ impl Pdf {
             page.guess(&fontbase, args)?;
         }
 
+        if args.verbose {
+            std::io::stdout().write(b"\n")?;
+        }
+
         Ok(())
     }
 
@@ -218,17 +214,18 @@ impl Pdf {
         content
     }
 
-    pub fn debug_content(&self) -> String {
+    pub fn get_margin(&self) -> f32 {
         self.pages
             .iter()
-            .map(|page| page.debug_content())
-            .collect::<Vec<String>>()
-            .join("\n")
-    }
-
-    pub fn save_content(&self, path: &Path) -> Result<()> {
-        std::fs::write(path, self.get_content())?;
-
-        Ok(())
+            .map(|page| {
+                page.lines
+                    .iter()
+                    .map(|line| line.words[0].rect.x)
+                    .min()
+                    .unwrap_or(0)
+            })
+            .min()
+            .unwrap_or(0) as f32
+            / 512.
     }
 }

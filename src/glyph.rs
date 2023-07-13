@@ -181,89 +181,19 @@ impl KnownGlyph {
         Ok(Self::find_glyph(&image))
     }
 
-    pub fn latex(
+    fn latex(
         base: &str,
         size: Size,
         styles: Vec<Style>,
         modifiers: Vec<String>,
         math: bool,
     ) -> String {
-        let mut result = modifiers
-            .iter()
-            .fold(base.to_string(), |acc, modif| format!("\\{modif}{{{acc}}}"));
+        let mut result = modifiers.iter().fold(String::from(base), |acc, modif| {
+            format!("\\{modif}{{{acc}}}")
+        });
         result = if math { format!("${result}$") } else { result };
         result = styles.iter().fold(result, |acc, style| style.apply(acc));
         size.apply(result)
-    }
-    pub fn get_latex(
-        &self,
-        current_size: &mut Size,
-        current_styles: &mut Vec<Style>,
-        math: &mut bool,
-        init: &mut bool,
-    ) -> String {
-        let mut text = "".to_string();
-
-        if !self.math && *math {
-            *math = self.math;
-            text.push('$');
-        }
-
-        if current_size != &self.size || *init {
-            if !*init {
-                for style in current_styles.iter().rev() {
-                    if style.is_math() {
-                        text.push_str("}$");
-                    } else {
-                        text.push_str("}");
-                    }
-                }
-                text.push_str("}");
-            }
-            current_styles.clear();
-            *current_size = self.size;
-            text.push_str(format!("\\{}{{", self.size).as_str());
-        }
-
-        let mut i = 0;
-        while i < current_styles.len() {
-            if !self.styles.contains(&current_styles[i]) {
-                if current_styles[i].is_math() {
-                    text.push_str("}$");
-                } else {
-                    text.push_str("}");
-                }
-
-                current_styles.remove(i);
-            } else {
-                i += 1;
-            }
-        }
-
-        for style in &self.styles {
-            if !current_styles.contains(&style) {
-                current_styles.push(*style);
-
-                if current_styles[i].is_math() {
-                    text.push_str(format!("$\\{}{{", style).as_str());
-                } else {
-                    text.push_str(format!("\\{}{{", style).as_str());
-                }
-            }
-        }
-
-        if self.math && !*math {
-            *math = self.math;
-            text.push('$');
-        }
-        let base = self.modifiers.iter().fold(self.base.clone(), |acc, modif| {
-            format!("\\{modif}{{{acc}}}")
-        });
-
-        text.push_str(&base);
-
-        *init = false;
-        text
     }
 
     fn find_baseline(image: &DynamicImage) -> u32 {
@@ -290,6 +220,83 @@ impl KnownGlyph {
         let offset = (y + height - 1 - baseline) as i32;
 
         (image.crop_imm(x, y, width, height), offset)
+    }
+
+    pub fn get_latex(
+        &self,
+        size: &mut Size,
+        styles: &mut Vec<Style>,
+        math: &mut bool,
+        init: &mut bool,
+    ) -> String {
+        let mut text = String::from("");
+
+        if !self.math && *math {
+            *math = self.math;
+            text.push('$');
+        }
+
+        if size != &self.size || *init {
+            if !*init {
+                for style in styles.iter().rev() {
+                    if style.is_math() {
+                        text.push_str("}$");
+                    } else if style != &Style::Normal {
+                        text.push_str("}");
+                    }
+                }
+                if *size != Size::Normalsize {
+                    text.push_str("}");
+                }
+            }
+            styles.clear();
+            *size = self.size;
+            if *size != Size::Normalsize {
+                text.push_str(&format!("\\{}{{", self.size));
+            }
+        }
+        *init = false;
+
+        let mut i = 0;
+        while i < styles.len() {
+            if !self.styles.contains(&styles[i]) {
+                if styles[i].is_math() {
+                    text.push_str("}$");
+                } else if styles[i] != Style::Normal {
+                    text.push_str("}");
+                }
+                styles.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+
+        for style in &self.styles {
+            if !styles.contains(&style) {
+                styles.push(*style);
+                if styles[i].is_math() {
+                    text.push_str(&format!("$\\{}{{", style));
+                } else if styles[i] != Style::Normal {
+                    text.push_str(&format!("\\{}{{", style));
+                }
+            }
+        }
+
+        if self.math && !*math {
+            *math = self.math;
+            text.push('$');
+        }
+
+        let base = self.modifiers.iter().fold(self.base.clone(), |acc, modif| {
+            format!("\\{modif}{{{acc}}}")
+        });
+        text.push_str(&base);
+
+        if self.base.starts_with("\\") {
+            text.push(' ');
+        }
+
+        text
     }
 }
 
@@ -376,8 +383,7 @@ impl UnknownGlyph {
         &mut self,
         fontbase: &FontBase,
         baseline: u32,
-        is_aligned: bool,
-        word_length: usize,
+        aligned: bool,
         hint: Option<(Code, Size)>,
     ) {
         let (code, size) = hint.unzip();
@@ -399,16 +405,13 @@ impl UnknownGlyph {
 
                             let offset = glyph.offset
                                 - ((self.rect.y + self.rect.height) as i32 - baseline as i32);
-                            let dist = self.distance(
-                                glyph,
-                                is_aligned.then_some(offset).unwrap_or(0),
-                                closest,
-                            );
+                            let dist =
+                                self.distance(glyph, if aligned { offset } else { 0 }, closest)
+                                    + if aligned { 0 } else { offset.abs() } as f32;
+
                             if dist < closest {
                                 closest = dist;
-                                self.dist = Some(
-                                    dist + is_aligned.then_some(0).unwrap_or(offset.abs()) as f32,
-                                );
+                                self.dist = Some(dist);
                                 self.guess = Some(glyph.clone());
                             }
 
@@ -421,8 +424,8 @@ impl UnknownGlyph {
             }
         }
 
-        if is_aligned && self.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
-            self.try_guess(fontbase, baseline, false, word_length, hint);
+        if aligned && self.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
+            self.try_guess(fontbase, baseline, false, hint);
         }
     }
 }
