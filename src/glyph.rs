@@ -181,7 +181,7 @@ impl KnownGlyph {
         Ok(Self::find_glyph(&image))
     }
 
-    fn latex(
+    pub fn latex(
         base: &str,
         size: Size,
         styles: Vec<Style>,
@@ -194,6 +194,76 @@ impl KnownGlyph {
         result = if math { format!("${base}$") } else { result };
         result = styles.iter().fold(result, |acc, style| style.apply(acc));
         size.apply(result)
+    }
+    pub fn get_latex(
+        &self,
+        current_size: &mut Size,
+        current_styles: &mut Vec<Style>,
+        math: &mut bool,
+        init: &mut bool,
+    ) -> String {
+        let mut text = "".to_string();
+
+        if !self.math && *math {
+            *math = self.math;
+            text.push('$');
+        }
+
+        if current_size != &self.size || *init {
+            if !*init {
+                for style in current_styles.iter().rev() {
+                    if style.is_math() {
+                        text.push_str("}$");
+                    } else {
+                        text.push_str("}");
+                    }
+                }
+                text.push_str("}");
+            }
+            current_styles.clear();
+            *current_size = self.size;
+            text.push_str(format!("\\{}{{", self.size).as_str());
+        }
+
+        let mut i = 0;
+        while i < current_styles.len() {
+            if !self.styles.contains(&current_styles[i]) {
+                if current_styles[i].is_math() {
+                    text.push_str("}$");
+                } else {
+                    text.push_str("}");
+                }
+
+                current_styles.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+
+        for style in &self.styles {
+            if !current_styles.contains(&style) {
+                current_styles.push(*style);
+
+                if current_styles[i].is_math() {
+                    text.push_str(format!("$\\{}{{", style).as_str());
+                } else {
+                    text.push_str(format!("\\{}{{", style).as_str());
+                }
+            }
+        }
+
+        if self.math && !*math {
+            *math = self.math;
+            text.push('$');
+        }
+        let base = self.modifiers.iter().fold(self.base.clone(), |acc, modif| {
+            format!("\\{modif}{{{acc}}}")
+        });
+
+        text.push_str(&base);
+
+        *init = false;
+        text
     }
 
     fn find_baseline(image: &DynamicImage) -> u32 {

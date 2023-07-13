@@ -1,4 +1,9 @@
-use crate::{pdf::Pdf, result::Result};
+use crate::utils::round;
+use crate::{
+    font::{Size, Style},
+    pdf::Pdf,
+    result::Result,
+};
 use std::{fs::File, io::Write};
 
 pub struct Latex {
@@ -32,26 +37,37 @@ impl Latex {
                 + "\n\\date{}"
                 + "\n\\usepackage{geometry}"
                 + "\n\\geometry{margin="
-                + (margin * 96 / 300).to_string().as_str()
+                + &(round(margin as f32 /512.,2)).to_string()
                 + "in, top="
-                + (self.pdf.pages[0].lines[0].rect.y).to_string().as_str()
+                // + &(self.pdf.pages[0].lines[0].rect.y).to_string()
                 + "0.7in}"
                 + "\n\\usepackage{amsmath}"
                 + "\n\\begin{document}",
         );
         for page in &self.pdf.pages {
+            let mut init = true;
+            let mut math = false;
+            let mut current_size = Size::Normalsize;
+            let mut current_styles = Vec::new();
             for line in &page.lines {
                 content.push_str("\n    ");
 
-                content.push_str(&String::from_iter(line.get_content().char_indices().map(
-                    |c| {
-                        if c.1.is_ascii() {
-                            c.1
-                        } else {
-                            '?'
-                        }
-                    },
-                )));
+                content.push_str(&line.get_latex(
+                    &mut current_size,
+                    &mut current_styles,
+                    &mut math,
+                    &mut init,
+                ));
+            }
+            for style in current_styles {
+                if style.is_math() {
+                    content.push_str("}$");
+                } else {
+                    content.push_str("}");
+                }
+            }
+            if math {
+                content.push('$');
             }
         }
         content.push_str("\n\\end{document}");

@@ -1,5 +1,5 @@
 use crate::font::{Code, FontBase, Size, Style};
-use crate::glyph::{Glyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD};
+use crate::glyph::{Glyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD, KnownGlyph};
 use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
@@ -141,9 +141,15 @@ impl Word {
         self.glyphs
             .iter()
             .map(|glyph| match &glyph.guess {
-                Some(guess) => guess.base.clone(),
+                Some(guess) => guess.base.to_owned(),
                 None => '\u{2584}'.to_string(),
             })
+            .collect()
+    }
+    pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, math: &mut bool, init: &mut bool) -> String {
+        self.glyphs
+            .iter()
+            .map(|glyph| glyph.guess.clone().unwrap().get_latex(current_size, current_styles, math, init))
             .collect()
     }
 
@@ -244,6 +250,13 @@ impl Line {
         self.words
             .iter()
             .map(|word| word.get_content())
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
+    pub fn get_latex(&self, current_size: &mut Size, current_styles: &mut Vec<Style>, math: &mut bool, init: &mut bool) -> String {
+        self.words
+            .iter()
+            .map(|word| word.get_latex(current_size, current_styles, math, init))
             .collect::<Vec<String>>()
             .join(" ")
     }

@@ -190,6 +190,10 @@ impl Style {
         ]
     }
 
+    pub fn is_math(&self) -> bool {
+        Self::math().iter().any(|style| style.contains(self))
+    }
+
     pub fn apply(&self, base: String) -> String {
         if self == &Self::Normal {
             base
