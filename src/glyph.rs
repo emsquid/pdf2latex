@@ -191,7 +191,7 @@ impl KnownGlyph {
         let mut result = modifiers
             .iter()
             .fold(base.to_string(), |acc, modif| format!("\\{modif}{{{acc}}}"));
-        result = if math { format!("${base}$") } else { result };
+        result = if math { format!("${result}$") } else { result };
         result = styles.iter().fold(result, |acc, style| style.apply(acc));
         size.apply(result)
     }

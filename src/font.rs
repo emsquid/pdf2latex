@@ -263,6 +263,13 @@ impl FontBase {
                 std::fs::create_dir_all(code.as_path())?;
 
                 let mut glyphs = Self::get_family(code, size)?;
+
+                for (i, glyph) in glyphs.clone().iter().enumerate().rev() {
+                    if glyph.math {
+                        glyphs.remove(i);
+                    }
+                }
+
                 let mut handles = Vec::new();
                 id += glyphs.len() as u32;
                 for (base, styles, modifiers, math) in symbols.clone() {
