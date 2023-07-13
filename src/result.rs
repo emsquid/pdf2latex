@@ -7,7 +7,7 @@ pub enum Error {
     /// Image error
     Image(image::error::ImageError),
     /// Serde error
-    Serde(serde_json::Error),
+    Bitcode(bitcode::Error),
     /// Custom error
     Custom(&'static str),
 }
@@ -18,7 +18,7 @@ impl std::fmt::Display for Error {
             Error::Io(err) => write!(f, "Io error: {err}"),
             Error::Parsing(err) => write!(f, "Parsing error: {err}"),
             Error::Image(err) => write!(f, "Image error: {err}"),
-            Error::Serde(err) => write!(f, "Serde error: {err}"),
+            Error::Bitcode(err) => write!(f, "Bitcode error: {err}"),
             Error::Custom(err) => write!(f, "{err}"),
         }
     }
@@ -44,9 +44,9 @@ impl From<image::ImageError> for Error {
     }
 }
 
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Self {
-        Error::Serde(err)
+impl From<bitcode::Error> for Error {
+    fn from(err: bitcode::Error) -> Self {
+        Error::Bitcode(err)
     }
 }
 

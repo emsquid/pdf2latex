@@ -1,0 +1,9 @@
+acute
+breve
+ddot
+grave
+tilde
+bar
+check
+hat
+vec

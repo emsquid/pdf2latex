@@ -1,13 +1,12 @@
 use crate::result::{Error, Result};
 use image::{DynamicImage, GrayImage};
-use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::ops::AddAssign;
 use std::path::Path;
 use std::process::Command;
 use std::{collections::HashMap, hash::Hash};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, bitcode::Encode, bitcode::Decode)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,
@@ -27,10 +26,6 @@ impl Rect {
 
     pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
         image.crop_imm(self.x, self.y, self.width, self.height)
-    }
-
-    pub fn center(&self) -> (u32, u32) {
-        (self.x + self.width / 2, self.y + self.height / 2)
     }
 }
 
@@ -164,8 +159,8 @@ pub fn log(
             stdout.write_all(format!("{message} \t[{bar}] in {duration}s").as_bytes())
         }
         (Some(progress), None) => {
-            let progress = (progress * 20.) as u32;
-            let percent = progress * 100 / 20;
+            let percent = (progress * 100.) as u32;
+            let progress = percent / 5;
             let bar = (0..20)
                 .map(|i| if i < progress { '=' } else { ' ' })
                 .collect::<String>();

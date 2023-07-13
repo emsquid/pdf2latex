@@ -156,13 +156,13 @@ impl Word {
                     if !guess.base.is_ascii() {
                         content.push_str("\x1b[31m");
                     }
-                    if guess.style == Style::Bold {
+                    if guess.styles.contains(&Style::Bold) {
                         content.push_str("\x1b[1;32m");
                     }
-                    if guess.style == Style::Italic {
+                    if guess.styles.contains(&Style::Italic) {
                         content.push_str("\x1b[3;34m");
                     }
-                    if guess.style == Style::Slanted {
+                    if guess.styles.contains(&Style::Slanted) {
                         content.push_str("\x1b[3;35m");
                     }
                     content.push_str(&guess.base);

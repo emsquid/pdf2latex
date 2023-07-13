@@ -8,7 +8,7 @@ pub struct Dictionary {
 
 impl Dictionary {
     pub fn new() -> Dictionary {
-        let file = std::include_str!("words.txt");
+        let file = std::include_str!("data/words.txt");
         let words = file.lines().map(String::from).collect();
         Dictionary { words }
     }
