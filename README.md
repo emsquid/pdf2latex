@@ -10,6 +10,7 @@ Prerequisites
 - [Git](https://git-scm.com/downloads)
 - [Rust toolchain](https://www.rust-lang.org/tools/install)
 - [Poppler](https://poppler.freedesktop.org)
+- [LaTeX](https://www.latex-project.org/get) (Optional: needed to create font files)
 
 Command line instructions
 ```bash
