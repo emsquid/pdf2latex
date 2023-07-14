@@ -25,7 +25,7 @@ pdf2latex super_cool.pdf -o cooler.tex
 
 ## Notes 
 
-The project currently requires `json` font files to recognize characters, ask us! 
+The project currently requires some `font` files to recognize characters, ask us! 
 These files should be placed in the following directories
   
 |Platform | Value                                           | Example                                            |
