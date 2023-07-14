@@ -148,23 +148,40 @@ pub fn log(
     action: &str,
 ) -> Result<()> {
     let mut stdout = std::io::stdout();
-
     stdout.write_all(format!("\x1b[{action}").as_bytes())?;
+
+    let tab = "\t".repeat(3_usize.saturating_sub(message.len() / 8));
     match (progress, duration) {
         (Some(progress), Some(duration)) => {
             let progress = (progress * 20.) as u32;
             let bar = (0..20)
-                .map(|i| if i < progress { '=' } else { ' ' })
+                .map(|i| {
+                    if i == progress {
+                        '>'
+                    } else if i < progress {
+                        '='
+                    } else {
+                        ' '
+                    }
+                })
                 .collect::<String>();
-            stdout.write_all(format!("{message} \t[{bar}] in {duration}s").as_bytes())
+            stdout.write_all(format!("{message}{tab}[{bar}] in {duration}s").as_bytes())
         }
         (Some(progress), None) => {
             let percent = (progress * 100.) as u32;
             let progress = percent / 5;
             let bar = (0..20)
-                .map(|i| if i < progress { '=' } else { ' ' })
+                .map(|i| {
+                    if i == progress {
+                        '>'
+                    } else if i < progress {
+                        '='
+                    } else {
+                        ' '
+                    }
+                })
                 .collect::<String>();
-            stdout.write_all(format!("{message} \t[{bar}] {percent}%").as_bytes())
+            stdout.write_all(format!("{message}{tab}[{bar}] {percent}%").as_bytes())
         }
         (None, Some(duration)) => stdout.write_all(format!("{message} in {duration}s").as_bytes()),
         (None, None) => stdout.write_all(message.as_bytes()),

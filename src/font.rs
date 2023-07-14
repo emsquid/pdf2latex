@@ -235,14 +235,14 @@ pub struct FontBase {
 
 impl FontBase {
     pub fn new(args: &Args) -> Result<FontBase> {
+        if let Some(code) = args.create {
+            Self::create_family(code, args)?;
+        }
+
         let now = time::Instant::now();
 
         if args.verbose {
             log("LOADING FONTS\n", None, None, "1m")?;
-        }
-
-        if let Some(code) = args.create {
-            Self::create_family(code, args)?;
         }
 
         let mut glyphs = HashMap::new();
@@ -270,21 +270,24 @@ impl FontBase {
     }
 
     fn create_family(code: Code, args: &Args) -> Result<()> {
+        if args.verbose {
+            log(&format!("CREATING FONT {code}\n"), None, None, "1m")?;
+        }
+
         std::thread::scope(|scope| -> Result<()> {
             std::fs::create_dir_all("temp")?;
 
-            if args.verbose {
-                log(&format!("creating font {code}"), Some(0.), None, "s")?;
-            }
-
-            let mut id = 0;
             let (symbols, count) = Self::generate_symbols();
             for size in Size::all() {
+                if args.verbose {
+                    log(&size.to_string(), Some(0.), None, "s")?;
+                }
+
                 std::fs::create_dir_all(code.as_path())?;
 
                 let mut glyphs = Self::get_family(code, size)?;
+                let mut id = glyphs.len();
                 let mut handles = Vec::new();
-                id += u32::try_from(glyphs.len())?;
                 for (base, styles, modifiers, math) in symbols.clone() {
                     for style in styles.clone() {
                         if glyphs.iter().any(|g| {
@@ -300,7 +303,7 @@ impl FontBase {
                         let base = base.clone();
                         let modifiers = modifiers.clone();
                         handles.push(scope.spawn(move || {
-                            KnownGlyph::from(&base, code, size, style, modifiers, math, id)
+                            KnownGlyph::from(&base, code, size, style, modifiers, math, id as u32)
                         }));
 
                         if handles.len() >= 4 {
@@ -313,7 +316,7 @@ impl FontBase {
 
                         if args.verbose {
                             let progress = id as f32 / count as f32;
-                            log(&format!("creating font {code}"), Some(progress), None, "u")?;
+                            log(&size.to_string(), Some(progress), None, "u")?;
                         }
 
                         id += 1;
@@ -327,17 +330,21 @@ impl FontBase {
 
                 let bit = bitcode::encode(&glyphs)?;
                 std::fs::write(format!("{}/{}", code.as_path(), size.as_path()), bit)?;
-            }
 
-            if args.verbose {
-                log(&format!("created font {code}"), Some(1.), None, "u")?;
-                std::io::stdout().write_all(b"\n")?;
+                if args.verbose {
+                    log(&size.to_string(), Some(1.), None, "u")?;
+                    std::io::stdout().write_all(b"\n")?;
+                }
             }
 
             std::fs::remove_dir_all("temp")?;
 
             Ok(())
         })?;
+
+        if args.verbose {
+            log(&format!("CREATED FONT {code}\n"), None, None, "1m")?;
+        }
 
         Ok(())
     }
@@ -523,7 +530,7 @@ impl FontBase {
         symbols.extend(Self::generate_misc());
         symbols.extend(Self::generate_math_accents());
 
-        let count = symbols.iter().map(|d| d.1.len() * Size::all().len()).sum();
+        let count = symbols.iter().map(|d| d.1.len()).sum();
         (symbols, count)
     }
 }
