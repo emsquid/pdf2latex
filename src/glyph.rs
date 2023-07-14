@@ -56,7 +56,7 @@ pub trait Glyph {
                 for (&(dx, dy), value) in &mut dist {
                     if *value < limit {
                         let v_g = self.get_pixel_signed(x as i32 - dx, y as i32 - dy);
-                        if (v_g - 1.).abs() > f32::EPSILON {
+                        if (v_g - 1.).abs() < f32::EPSILON {
                             let v_o = other
                                 .get_pixel(x.wrapping_add_signed(dx), y.wrapping_add_signed(dy));
                             *value += (v_g - v_o).powf(2.);
