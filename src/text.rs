@@ -100,8 +100,12 @@ impl Word {
         }
     }
 
-    pub fn get_guess(&self, g: usize) -> Option<KnownGlyph> {
-        self.glyphs.get(g).and_then(|glyph| glyph.guess.clone())
+    pub fn get_first_guess(&self) -> Option<KnownGlyph> {
+        self.glyphs.first().and_then(|glyph| glyph.guess.clone())
+    }
+
+    pub fn get_last_guess(&self) -> Option<KnownGlyph> {
+        self.glyphs.last().and_then(|glyph| glyph.guess.clone())
     }
 
     pub fn get_content(&self) -> String {
@@ -119,13 +123,12 @@ impl Word {
             .iter()
             .enumerate()
             .map(|(i, glyph)| {
-                let prev = self.get_guess(i - 1).or(prev.clone());
-                let next = self.get_guess(i + 1).or(next.clone());
+                let prev = self.glyphs.get(i - 1).map_or(prev, |g| &g.guess);
+                let next = self.glyphs.get(i + 1).map_or(next, |g| &g.guess);
 
-                glyph
-                    .guess
-                    .clone()
-                    .map_or(String::from("?"), |g| g.get_latex(&prev, &next))
+                glyph.guess.clone().map_or(String::from("?"), |g| {
+                    g.get_latex(prev, next, i == self.glyphs.len() - 1)
+                })
             })
             .collect()
     }
@@ -180,8 +183,16 @@ impl Line {
         }
     }
 
-    pub fn get_guess(&self, w: usize, g: usize) -> Option<KnownGlyph> {
-        self.words.get(w).and_then(|word| word.get_guess(g))
+    pub fn get_first_guess(&self) -> Option<KnownGlyph> {
+        self.words
+            .first()
+            .and_then(|word| word.glyphs.first().and_then(|glyph| glyph.guess.clone()))
+    }
+
+    pub fn get_last_guess(&self) -> Option<KnownGlyph> {
+        self.words
+            .last()
+            .and_then(|word| word.glyphs.last().and_then(|glyph| glyph.guess.clone()))
     }
 
     pub fn get_content(&self) -> String {
@@ -197,9 +208,14 @@ impl Line {
             .iter()
             .enumerate()
             .map(|(i, word)| {
-                let g = self.words.get(i - 1).map_or(0, |w| w.glyphs.len() - 1);
-                let prev = self.get_guess(i - 1, g).or(prev.clone());
-                let next = self.get_guess(i + 1, 0).or(next.clone());
+                let prev = self
+                    .words
+                    .get(i - 1)
+                    .map_or(prev.clone(), Word::get_last_guess);
+                let next = self
+                    .words
+                    .get(i + 1)
+                    .map_or(next.clone(), Word::get_first_guess);
 
                 word.get_latex(&prev, &next)
             })

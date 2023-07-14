@@ -1,6 +1,6 @@
 use crate::args::Args;
 use crate::font::FontBase;
-use crate::glyph::{Glyph, KnownGlyph};
+use crate::glyph::Glyph;
 use crate::result::Result;
 use crate::text::Line;
 use crate::utils::{find_parts, log, pdf_to_images, Rect};
@@ -86,10 +86,6 @@ impl Page {
 
             Ok(())
         })
-    }
-
-    pub fn get_guess(&self, l: usize, w: usize, g: usize) -> Option<KnownGlyph> {
-        self.lines.get(l).and_then(|line| line.get_guess(w, g))
     }
 
     pub fn get_content(&self) -> String {

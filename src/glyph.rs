@@ -206,7 +206,12 @@ impl KnownGlyph {
         (image.crop_imm(x, y, width, height), offset)
     }
 
-    pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
+    pub fn get_latex(
+        &self,
+        prev: &Option<KnownGlyph>,
+        next: &Option<KnownGlyph>,
+        end: bool,
+    ) -> String {
         let mut result = String::new();
         let default = (Size::Normalsize, vec![Style::Normal], false);
 
@@ -228,14 +233,19 @@ impl KnownGlyph {
             }
         }
 
-        let base = self.modifiers.iter().fold(self.base.clone(), |acc, modif| {
-            format!("\\{modif}{{{acc}}}")
-        });
-        result.push_str(&base);
+        result.push_str(
+            &self.modifiers.iter().fold(self.base.clone(), |acc, modif| {
+                format!("\\{modif}{{{acc}}}")
+            }),
+        );
 
         let (size, styles, math) = next.clone().map_or(default.clone(), |glyph| {
             (glyph.size, glyph.styles, glyph.math)
         });
+
+        if self.base.starts_with('\\') && !end {
+            result.push(' ');
+        }
 
         for style in &self.styles {
             if !styles.contains(style) && *style != Style::Normal {
