@@ -91,7 +91,7 @@ impl Page {
     pub fn get_content(&self) -> String {
         self.lines
             .iter()
-            .map(|line| line.get_content())
+            .map(Line::get_content)
             .collect::<Vec<String>>()
             .join("\n")
     }
@@ -138,7 +138,7 @@ impl Page {
                                         (line.baseline + y - glyph.rect.height)
                                             .saturating_add_signed(guess.offset),
                                         c,
-                                    )
+                                    );
                                 }
                             }
                         }
@@ -197,7 +197,7 @@ impl Pdf {
         }
 
         if args.verbose {
-            std::io::stdout().write(b"\n")?;
+            std::io::stdout().write_all(b"\n")?;
         }
 
         Ok(())
@@ -207,7 +207,7 @@ impl Pdf {
         let content = self
             .pages
             .iter()
-            .map(|page| page.get_content())
+            .map(Page::get_content)
             .collect::<Vec<String>>()
             .join("\n");
 

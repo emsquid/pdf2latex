@@ -2,6 +2,7 @@ use crate::args::Args;
 use crate::glyph::KnownGlyph;
 use crate::result::Result;
 use crate::utils::log;
+use bitcode::Encode;
 use clap::ValueEnum;
 use std::collections::HashMap;
 use std::io::Write;
@@ -9,8 +10,17 @@ use std::path::PathBuf;
 use std::{time, vec};
 
 const ALPHABET: &str = "abcdefghijklmnopqrstuvwxyz";
+const ACCENTS: &str = include_str!("data/accents.txt");
+const MATH_ACCENTS: &str = include_str!("data/math_accents.txt");
+const PUNCTUATIONS: &str = include_str!("data/punctuations.txt");
+const LIGATURES: &str = include_str!("data/ligatures.txt");
+const GREEKS: &str = include_str!("data/greeks.txt");
+const CONSTRUCTS: &str = include_str!("data/constructs.txt");
+const OPERATIONS: &str = include_str!("data/operations.txt");
+const ARROWS: &str = include_str!("data/arrows.txt");
+const MISCELLANEOUS: &str = include_str!("data/miscellaneous.txt");
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ValueEnum, bitcode::Encode, bitcode::Decode)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ValueEnum, Encode, bitcode::Decode)]
 pub enum Code {
     Cmr,
     Lmr,
@@ -49,7 +59,7 @@ impl Code {
         ]
     }
 
-    pub fn as_path(&self) -> String {
+    pub fn as_path(self) -> String {
         let config = dirs::config_dir().unwrap_or(PathBuf::from("~/.config"));
         format!("{}/pdf2latex/{self}", config.display())
     }
@@ -103,7 +113,7 @@ impl Size {
         ]
     }
 
-    pub fn as_path(&self) -> String {
+    pub fn as_path(self) -> String {
         match self {
             Size::Tiny => "tiny",
             Size::Scriptsize => "scriptsize",
@@ -119,8 +129,8 @@ impl Size {
         .to_string()
     }
 
-    pub fn apply(&self, base: String) -> String {
-        if self == &Self::Normalsize {
+    pub fn apply(self, base: String) -> String {
+        if self == Self::Normalsize {
             base
         } else {
             format!("\\{self}{{{base}}}")
@@ -139,6 +149,7 @@ pub enum Style {
     BlackBoard,
     Calligraphic,
     Fraktur,
+    Script,
     EuScript,
 }
 
@@ -153,6 +164,7 @@ impl std::fmt::Display for Style {
             Style::BlackBoard => "mathbb",
             Style::Calligraphic => "mathcal",
             Style::Fraktur => "mathfrak",
+            Style::Script => "mathscr",
             Style::EuScript => "EuScript",
         };
         write!(f, "{string}")
@@ -172,6 +184,7 @@ impl Style {
             vec![Style::BlackBoard],
             vec![Style::Calligraphic],
             vec![Style::Fraktur],
+            vec![Style::Script],
             vec![Style::EuScript],
         ]
     }
@@ -193,25 +206,23 @@ impl Style {
             vec![Style::BlackBoard],
             vec![Style::Calligraphic],
             vec![Style::Fraktur],
+            vec![Style::Script],
             vec![Style::EuScript],
         ]
     }
 
-    pub fn is_math(&self) -> bool {
-        Self::math().iter().any(|style| style.contains(self))
+    pub fn is_math(self) -> bool {
+        Self::math().iter().any(|style| style.contains(&self))
     }
 
-    pub fn apply(&self, base: String) -> String {
-        if self == &Self::Normal {
+    pub fn apply(self, base: String) -> String {
+        if self == Self::Normal {
             base
+        } else if Self::math().iter().any(|style| style.contains(&self)) {
+            let base = base.replace('$', "");
+            format!("$\\{self}{{{base}}}$")
         } else {
-            match Self::math().iter().any(|style| style.contains(self)) {
-                true => {
-                    let base = base.replace("$", "");
-                    format!("$\\{self}{{{base}}}$")
-                }
-                false => format!("\\{self}{{{base}}}"),
-            }
+            format!("\\{self}{{{base}}}")
         }
     }
 }
@@ -272,7 +283,7 @@ impl FontBase {
 
                 let mut glyphs = Self::get_family(code, size)?;
                 let mut handles = Vec::new();
-                id += glyphs.len() as u32;
+                id += u32::try_from(glyphs.len())?;
                 for (base, styles, modifiers, math) in symbols.clone() {
                     for style in styles.clone() {
                         if glyphs.iter().any(|g| {
@@ -285,13 +296,13 @@ impl FontBase {
                             continue;
                         }
 
-                        let t_base = base.clone();
-                        let t_modifiers = modifiers.clone();
+                        let base = base.clone();
+                        let modifiers = modifiers.clone();
                         handles.push(scope.spawn(move || {
-                            KnownGlyph::from(&t_base, code, size, style, t_modifiers, math, id)
+                            KnownGlyph::from(&base, code, size, style, modifiers, math, id)
                         }));
 
-                        if handles.len() >= 8 {
+                        if handles.len() >= 4 {
                             let glyph = handles.remove(0).join().unwrap()?;
                             glyphs.push(glyph);
 
@@ -300,13 +311,10 @@ impl FontBase {
                         }
 
                         if args.verbose {
-                            log(
-                                &format!("creating font {code}"),
-                                Some(id as f32 / count as f32),
-                                None,
-                                "u",
-                            )?;
+                            let progress = id as f32 / count as f32;
+                            log(&format!("creating font {code}"), Some(progress), None, "u")?;
                         }
+
                         id += 1;
                     }
                 }
@@ -376,6 +384,8 @@ impl FontBase {
         }
         for n in 0..10 {
             symbols.push((n.to_string(), Style::text(), vec![], false));
+            symbols.push((format!("^{n}"), vec![vec![Style::Normal]], vec![], true));
+            symbols.push((format!("_{n}"), vec![vec![Style::Normal]], vec![], true));
         }
 
         symbols
@@ -383,7 +393,7 @@ impl FontBase {
 
     fn generate_accents() -> Vec<GlyphData> {
         let mut symbols = Vec::new();
-        for accent in include_str!("data/accents.txt").lines() {
+        for accent in ACCENTS.lines() {
             for chr in ALPHABET.chars() {
                 symbols.push((
                     chr.to_lowercase().to_string(),
@@ -405,7 +415,7 @@ impl FontBase {
 
     fn generate_math_accents() -> Vec<GlyphData> {
         let mut symbols = Vec::new();
-        for accent in include_str!("data/math_accents.txt").lines() {
+        for accent in MATH_ACCENTS.lines() {
             for chr in ALPHABET.chars() {
                 symbols.push((
                     chr.to_lowercase().to_string(),
@@ -426,26 +436,21 @@ impl FontBase {
     }
 
     fn generate_punctuations() -> Vec<GlyphData> {
-        include_str!("data/punctuations.txt")
+        PUNCTUATIONS
             .lines()
-            .flat_map(|punct| {
-                [
-                    (punct.to_string(), Style::text(), vec![], false),
-                    (punct.to_string(), vec![vec![Style::Normal]], vec![], true),
-                ]
-            })
+            .map(|punct| (punct.to_string(), Style::text(), vec![], false))
             .collect()
     }
 
     fn generate_ligatures() -> Vec<GlyphData> {
-        include_str!("data/ligatures.txt")
+        LIGATURES
             .lines()
             .map(|lig| (lig.to_string(), Style::text(), vec![], false))
             .collect()
     }
 
     fn generate_greeks() -> Vec<GlyphData> {
-        include_str!("data/greeks.txt")
+        GREEKS
             .lines()
             .map(|greek| (greek.to_string(), vec![vec![Style::Normal]], vec![], true))
             .collect()
@@ -453,7 +458,7 @@ impl FontBase {
 
     fn generate_constructs() -> Vec<GlyphData> {
         let mut symbols = Vec::new();
-        for construct in include_str!("data/constructs.txt").lines() {
+        for construct in CONSTRUCTS.lines() {
             for chr in ALPHABET.chars() {
                 symbols.push((
                     chr.to_lowercase().to_string(),
@@ -473,22 +478,22 @@ impl FontBase {
         symbols
     }
 
-    fn generate_arrows() -> Vec<GlyphData> {
-        include_str!("data/arrows.txt")
-            .lines()
-            .map(|arrow| (arrow.to_string(), vec![vec![Style::Normal]], vec![], true))
-            .collect()
-    }
-
     fn generate_operations() -> Vec<GlyphData> {
-        include_str!("data/operations.txt")
+        OPERATIONS
             .lines()
             .map(|op| (op.to_string(), vec![vec![Style::Normal]], vec![], true))
             .collect()
     }
 
+    fn generate_arrows() -> Vec<GlyphData> {
+        ARROWS
+            .lines()
+            .map(|arrow| (arrow.to_string(), vec![vec![Style::Normal]], vec![], true))
+            .collect()
+    }
+
     fn generate_misc() -> Vec<GlyphData> {
-        include_str!("data/miscellaneous.txt")
+        MISCELLANEOUS
             .lines()
             .map(|misc| (misc.to_string(), vec![vec![Style::Normal]], vec![], true))
             .collect()

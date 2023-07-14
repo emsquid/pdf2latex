@@ -1,4 +1,4 @@
-use crate::font::{Code, FontBase, Size, Style};
+use crate::font::{FontBase, Size, Style};
 use crate::glyph::{Glyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD};
 use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
@@ -29,10 +29,11 @@ impl Word {
                                     nx + glyph.rect.x - bounds.x,
                                     ny + glyph.rect.y - bounds.y,
                                     image::Luma([255]),
-                                )
+                                );
                             }
                         }
                     }
+
                     glyphs.push(glyph);
                 }
             }
@@ -57,7 +58,7 @@ impl Word {
 
     pub fn guess(&mut self, fontbase: &FontBase, baseline: u32) {
         for glyph in &mut self.glyphs {
-            glyph.try_guess(fontbase, baseline, true, None);
+            glyph.try_guess(fontbase, baseline, true);
         }
 
         let mut base_index: usize = self.glyphs.len();
@@ -77,16 +78,14 @@ impl Word {
                     .dist
                     .unwrap_or(f32::INFINITY);
 
-                let mut joined = self.glyphs[base_index].join(&self.glyphs[base_index - 1]);
-                for i in 2..=collapse_length {
+                let mut joined = self.glyphs[base_index].clone();
+                for i in 1..=collapse_length {
                     joined = joined.join(&self.glyphs[base_index - i]);
                 }
-                joined.try_guess(fontbase, baseline, true, None);
+                joined.try_guess(fontbase, baseline, true);
 
                 if joined.dist.unwrap_or(f32::INFINITY) < dist {
-                    for _ in 0..(collapse_length + 1) {
-                        self.glyphs.remove(base_index - collapse_length);
-                    }
+                    self.glyphs.drain(base_index - collapse_length..=base_index);
                     self.glyphs.insert(base_index - collapse_length, joined);
                     base_index -= collapse_length;
                     continue 'outer;
@@ -96,7 +95,7 @@ impl Word {
 
         for glyph in &mut self.glyphs {
             if glyph.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
-                glyph.try_guess(fontbase, baseline, false, None);
+                glyph.try_guess(fontbase, baseline, false);
             }
         }
     }
@@ -105,7 +104,7 @@ impl Word {
         self.glyphs
             .iter()
             .map(|glyph| match &glyph.guess {
-                Some(guess) => guess.base.to_owned(),
+                Some(guess) => guess.base.clone(),
                 None => '\u{2584}'.to_string(),
             })
             .collect()
@@ -121,11 +120,9 @@ impl Word {
         self.glyphs
             .iter()
             .map(|glyph| {
-                glyph
-                    .guess
-                    .clone()
-                    .map(|known| known.get_latex(size, styles, math, init))
-                    .unwrap_or(String::from("?"))
+                glyph.guess.clone().map_or(String::from("?"), |known| {
+                    known.get_latex(size, styles, math, init)
+                })
             })
             .collect()
     }
@@ -183,7 +180,7 @@ impl Line {
     pub fn get_content(&self) -> String {
         self.words
             .iter()
-            .map(|word| word.get_content())
+            .map(Word::get_content)
             .collect::<Vec<String>>()
             .join(" ")
     }

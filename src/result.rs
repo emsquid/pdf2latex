@@ -8,6 +8,8 @@ pub enum Error {
     Image(image::error::ImageError),
     /// Serde error
     Bitcode(bitcode::Error),
+    /// Num
+    Num(core::num::TryFromIntError),
     /// Custom error
     Custom(&'static str),
 }
@@ -19,6 +21,7 @@ impl std::fmt::Display for Error {
             Error::Parsing(err) => write!(f, "Parsing error: {err}"),
             Error::Image(err) => write!(f, "Image error: {err}"),
             Error::Bitcode(err) => write!(f, "Bitcode error: {err}"),
+            Error::Num(err) => write!(f, "Num error: {err}"),
             Error::Custom(err) => write!(f, "{err}"),
         }
     }
@@ -47,6 +50,12 @@ impl From<image::ImageError> for Error {
 impl From<bitcode::Error> for Error {
     fn from(err: bitcode::Error) -> Self {
         Error::Bitcode(err)
+    }
+}
+
+impl From<core::num::TryFromIntError> for Error {
+    fn from(err: core::num::TryFromIntError) -> Self {
+        Error::Num(err)
     }
 }
 

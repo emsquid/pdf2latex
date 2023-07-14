@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::process::Command;
 
 pub const DIST_UNALIGNED_THRESHOLD: f32 = 32.;
-pub const DIST_THRESHOLD: f32 = 10.;
+pub const DIST_THRESHOLD: f32 = 8.;
 pub const CHAR_THRESHOLD: u8 = 75;
 
 pub trait Glyph {
@@ -25,9 +25,7 @@ pub trait Glyph {
         if x < 0 || y < 0 || x >= self.rect().width as i32 || y >= self.rect().height as i32 {
             1.
         } else {
-            f32::from(
-                self.image()[(x.unsigned_abs() + y.unsigned_abs() * self.rect().width) as usize],
-            ) / 255.
+            f32::from(self.image()[(x as u32 + y as u32 * self.rect().width) as usize]) / 255.
         }
     }
 
@@ -44,7 +42,7 @@ pub trait Glyph {
                 for (&(dx, dy), value) in &mut dist {
                     if *value < limit {
                         let v_g = self.get_pixel(x, y);
-                        if v_g != 1. {
+                        if (v_g - 1.).abs() > f32::EPSILON {
                             let v_o = other.get_pixel_signed(x as i32 + dx, y as i32 + dy);
                             *value += (v_g - v_o).powf(2.);
                         }
@@ -58,7 +56,7 @@ pub trait Glyph {
                 for (&(dx, dy), value) in &mut dist {
                     if *value < limit {
                         let v_g = self.get_pixel_signed(x as i32 - dx, y as i32 - dy);
-                        if v_g == 1. {
+                        if (v_g - 1.).abs() > f32::EPSILON {
                             let v_o = other
                                 .get_pixel(x.wrapping_add_signed(dx), y.wrapping_add_signed(dy));
                             *value += (v_g - v_o).powf(2.);
@@ -119,15 +117,7 @@ impl KnownGlyph {
         math: bool,
         id: u32,
     ) -> Result<KnownGlyph> {
-        let (image, offset) = Self::render(
-            base,
-            code,
-            size,
-            styles.clone(),
-            modifiers.clone(),
-            math,
-            id,
-        )?;
+        let (image, offset) = Self::render(base, code, size, &styles, &modifiers, math, id)?;
 
         Ok(KnownGlyph {
             base: base.to_string(),
@@ -146,8 +136,8 @@ impl KnownGlyph {
         base: &str,
         code: Code,
         size: Size,
-        styles: Vec<Style>,
-        modifiers: Vec<String>,
+        styles: &[Style],
+        modifiers: &[String],
         math: bool,
         id: u32,
     ) -> Result<(DynamicImage, i32)> {
@@ -155,7 +145,7 @@ impl KnownGlyph {
         let doc = format!(
             "\\documentclass[11pt, border=4pt]{{standalone}}
             \\usepackage{{amsmath, amssymb, amsthm}}
-            \\usepackage{{euscript}}
+            \\usepackage{{euscript, mathrsfs}}
             \\begin{{document}}
             . {{\\fontfamily{{{code}}}\\selectfont
                 {latex}
@@ -181,13 +171,7 @@ impl KnownGlyph {
         Ok(Self::find_glyph(&image))
     }
 
-    fn latex(
-        base: &str,
-        size: Size,
-        styles: Vec<Style>,
-        modifiers: Vec<String>,
-        math: bool,
-    ) -> String {
+    fn latex(base: &str, size: Size, styles: &[Style], modifiers: &[String], math: bool) -> String {
         let mut result = modifiers.iter().fold(String::from(base), |acc, modif| {
             format!("\\{modif}{{{acc}}}")
         });
@@ -206,7 +190,7 @@ impl KnownGlyph {
     }
 
     fn find_glyph(image: &DynamicImage) -> (DynamicImage, i32) {
-        let baseline = Self::find_baseline(&image);
+        let baseline = Self::find_baseline(image);
         let image = image.crop_imm(45, 0, image.width(), image.height());
 
         let vertical = find_parts(&image.to_luma8(), 0);
@@ -229,30 +213,30 @@ impl KnownGlyph {
         math: &mut bool,
         init: &mut bool,
     ) -> String {
-        let mut text = String::from("");
+        let mut result = String::new();
 
         if !self.math && *math {
             *math = self.math;
-            text.push('$');
+            result.push('$');
         }
 
         if size != &self.size || *init {
             if !*init {
                 for style in styles.iter().rev() {
                     if style.is_math() {
-                        text.push_str("}$");
+                        result.push_str("}$");
                     } else if style != &Style::Normal {
-                        text.push_str("}");
+                        result.push('}');
                     }
                 }
                 if *size != Size::Normalsize {
-                    text.push_str("}");
+                    result.push('}');
                 }
             }
             styles.clear();
             *size = self.size;
             if *size != Size::Normalsize {
-                text.push_str(&format!("\\{}{{", self.size));
+                result.push_str(&format!("\\{size}{{"));
             }
         }
         *init = false;
@@ -261,9 +245,9 @@ impl KnownGlyph {
         while i < styles.len() {
             if !self.styles.contains(&styles[i]) {
                 if styles[i].is_math() {
-                    text.push_str("}$");
+                    result.push_str("}$");
                 } else if styles[i] != Style::Normal {
-                    text.push_str("}");
+                    result.push('}');
                 }
                 styles.remove(i);
             } else {
@@ -272,31 +256,31 @@ impl KnownGlyph {
         }
 
         for style in &self.styles {
-            if !styles.contains(&style) {
+            if !styles.contains(style) {
                 styles.push(*style);
                 if styles[i].is_math() {
-                    text.push_str(&format!("$\\{}{{", style));
+                    result.push_str(&format!("$\\{style}{{"));
                 } else if styles[i] != Style::Normal {
-                    text.push_str(&format!("\\{}{{", style));
+                    result.push_str(&format!("\\{style}{{"));
                 }
             }
         }
 
         if self.math && !*math {
             *math = self.math;
-            text.push('$');
+            result.push('$');
         }
 
         let base = self.modifiers.iter().fold(self.base.clone(), |acc, modif| {
             format!("\\{modif}{{{acc}}}")
         });
-        text.push_str(&base);
+        result.push_str(&base);
 
-        if self.base.starts_with("\\") {
-            text.push(' ');
+        if self.base.starts_with('\\') {
+            result.push(' ');
         }
 
-        text
+        result
     }
 }
 
@@ -379,30 +363,15 @@ impl UnknownGlyph {
         }
     }
 
-    pub fn try_guess(
-        &mut self,
-        fontbase: &FontBase,
-        baseline: u32,
-        aligned: bool,
-        hint: Option<(Code, Size)>,
-    ) {
-        let (code, size) = hint.unzip();
-        let mut closest = self.dist.unwrap_or(f32::MAX / 1.1) * 1.1;
-        'outer: for (&key, family) in &fontbase.glyphs {
-            if code.is_some() && Some(key) != code {
-                continue;
-            }
-
+    pub fn try_guess(&mut self, fontbase: &FontBase, baseline: u32, aligned: bool) {
+        let mut closest = self.dist.unwrap_or(f32::INFINITY) * 1.5;
+        'outer: for family in fontbase.glyphs.values() {
             for dw in [0, -1, 1, -2, 2] {
                 for dh in [0, -1, 1, -2, 2] {
                     let width = self.rect.width.saturating_add_signed(dw);
                     let height = self.rect.height.saturating_add_signed(dh);
                     if let Some(glyphs) = family.get(&(width, height)) {
                         for glyph in glyphs {
-                            if size.is_some() && Some(glyph.size) != size {
-                                continue;
-                            }
-
                             let offset = glyph.offset
                                 - ((self.rect.y + self.rect.height) as i32 - baseline as i32);
                             let dist =
@@ -425,7 +394,7 @@ impl UnknownGlyph {
         }
 
         if aligned && self.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
-            self.try_guess(fontbase, baseline, false, hint);
+            self.try_guess(fontbase, baseline, false);
         }
     }
 }
