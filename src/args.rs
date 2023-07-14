@@ -1,7 +1,6 @@
+use crate::font::Code;
 use clap::{arg, command, Parser};
 use std::path::PathBuf;
-
-use crate::font::Code;
 
 #[derive(Parser)]
 #[command(author, version, about)]

@@ -1,5 +1,6 @@
 use crate::result::{Error, Result};
 use image::{DynamicImage, GrayImage};
+use std::cmp::Ordering;
 use std::io::Write;
 use std::ops::AddAssign;
 use std::path::Path;
@@ -155,33 +156,25 @@ pub fn log(
         (Some(progress), Some(duration)) => {
             let progress = (progress * 20.) as u32;
             let bar = (0..20)
-                .map(|i| {
-                    if i == progress {
-                        '>'
-                    } else if i < progress {
-                        '='
-                    } else {
-                        ' '
-                    }
+                .map(|i| match progress.cmp(&i) {
+                    Ordering::Equal => '>',
+                    Ordering::Greater => '=',
+                    Ordering::Less => ' ',
                 })
                 .collect::<String>();
-            stdout.write_all(format!("{message}{tab}[{bar}] in {duration}s").as_bytes())
+            stdout.write_all(format!("{message}{tab} [{bar}] in {duration}s").as_bytes())
         }
         (Some(progress), None) => {
             let percent = (progress * 100.) as u32;
             let progress = percent / 5;
             let bar = (0..20)
-                .map(|i| {
-                    if i == progress {
-                        '>'
-                    } else if i < progress {
-                        '='
-                    } else {
-                        ' '
-                    }
+                .map(|i| match progress.cmp(&i) {
+                    Ordering::Equal => '>',
+                    Ordering::Greater => '=',
+                    Ordering::Less => ' ',
                 })
                 .collect::<String>();
-            stdout.write_all(format!("{message}{tab}[{bar}] {percent}%").as_bytes())
+            stdout.write_all(format!("{message}{tab} [{bar}] {percent}%").as_bytes())
         }
         (None, Some(duration)) => stdout.write_all(format!("{message} in {duration}s").as_bytes()),
         (None, None) => stdout.write_all(message.as_bytes()),

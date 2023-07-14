@@ -206,69 +206,26 @@ impl KnownGlyph {
         (image.crop_imm(x, y, width, height), offset)
     }
 
-    pub fn get_latex(
-        &self,
-        size: &mut Size,
-        styles: &mut Vec<Style>,
-        math: &mut bool,
-        init: &mut bool,
-    ) -> String {
+    pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
         let mut result = String::new();
+        let default = (Size::Normalsize, vec![Style::Normal], false);
 
-        if !self.math && *math {
-            *math = self.math;
+        let (size, styles, math) = prev.clone().map_or(default.clone(), |glyph| {
+            (glyph.size, glyph.styles, glyph.math)
+        });
+
+        if self.size != size && self.size != Size::Normalsize && !math {
+            result.push_str(&format!("{{\\{} ", self.size));
+        }
+
+        if self.math && !math {
             result.push('$');
-        }
-
-        if size != &self.size || *init {
-            if !*init {
-                for style in styles.iter().rev() {
-                    if style.is_math() {
-                        result.push_str("}$");
-                    } else if style != &Style::Normal {
-                        result.push('}');
-                    }
-                }
-                if *size != Size::Normalsize {
-                    result.push('}');
-                }
-            }
-            styles.clear();
-            *size = self.size;
-            if *size != Size::Normalsize {
-                result.push_str(&format!("\\{size}{{"));
-            }
-        }
-        *init = false;
-
-        let mut i = 0;
-        while i < styles.len() {
-            if !self.styles.contains(&styles[i]) {
-                if styles[i].is_math() {
-                    result.push_str("}$");
-                } else if styles[i] != Style::Normal {
-                    result.push('}');
-                }
-                styles.remove(i);
-            } else {
-                i += 1;
-            }
         }
 
         for style in &self.styles {
-            if !styles.contains(style) {
-                styles.push(*style);
-                if styles[i].is_math() {
-                    result.push_str(&format!("$\\{style}{{"));
-                } else if styles[i] != Style::Normal {
-                    result.push_str(&format!("\\{style}{{"));
-                }
+            if !styles.contains(style) && *style != Style::Normal {
+                result.push_str(&format!("\\{style}{{"));
             }
-        }
-
-        if self.math && !*math {
-            *math = self.math;
-            result.push('$');
         }
 
         let base = self.modifiers.iter().fold(self.base.clone(), |acc, modif| {
@@ -276,8 +233,22 @@ impl KnownGlyph {
         });
         result.push_str(&base);
 
-        if self.base.starts_with('\\') {
-            result.push(' ');
+        let (size, styles, math) = next.clone().map_or(default.clone(), |glyph| {
+            (glyph.size, glyph.styles, glyph.math)
+        });
+
+        for style in &self.styles {
+            if !styles.contains(style) && *style != Style::Normal {
+                result.push('}');
+            }
+        }
+
+        if self.math && !math {
+            result.push('$');
+        }
+
+        if self.size != size && self.size != Size::Normalsize && !self.math {
+            result.push('}');
         }
 
         result

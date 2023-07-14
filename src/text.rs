@@ -1,5 +1,5 @@
-use crate::font::{FontBase, Size, Style};
-use crate::glyph::{Glyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD};
+use crate::font::FontBase;
+use crate::glyph::{Glyph, KnownGlyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD};
 use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
 use crate::utils::{average, find_parts, Rect};
 use image::DynamicImage;
@@ -100,6 +100,10 @@ impl Word {
         }
     }
 
+    pub fn get_guess(&self, g: usize) -> Option<KnownGlyph> {
+        self.glyphs.get(g).and_then(|glyph| glyph.guess.clone())
+    }
+
     pub fn get_content(&self) -> String {
         self.glyphs
             .iter()
@@ -110,19 +114,18 @@ impl Word {
             .collect()
     }
 
-    pub fn get_latex(
-        &self,
-        size: &mut Size,
-        styles: &mut Vec<Style>,
-        math: &mut bool,
-        init: &mut bool,
-    ) -> String {
+    pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
         self.glyphs
             .iter()
-            .map(|glyph| {
-                glyph.guess.clone().map_or(String::from("?"), |known| {
-                    known.get_latex(size, styles, math, init)
-                })
+            .enumerate()
+            .map(|(i, glyph)| {
+                let prev = self.get_guess(i - 1).or(prev.clone());
+                let next = self.get_guess(i + 1).or(next.clone());
+
+                glyph
+                    .guess
+                    .clone()
+                    .map_or(String::from("?"), |g| g.get_latex(&prev, &next))
             })
             .collect()
     }
@@ -177,6 +180,10 @@ impl Line {
         }
     }
 
+    pub fn get_guess(&self, w: usize, g: usize) -> Option<KnownGlyph> {
+        self.words.get(w).and_then(|word| word.get_guess(g))
+    }
+
     pub fn get_content(&self) -> String {
         self.words
             .iter()
@@ -184,16 +191,18 @@ impl Line {
             .collect::<Vec<String>>()
             .join(" ")
     }
-    pub fn get_latex(
-        &self,
-        size: &mut Size,
-        styles: &mut Vec<Style>,
-        math: &mut bool,
-        init: &mut bool,
-    ) -> String {
+
+    pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
         self.words
             .iter()
-            .map(|word| word.get_latex(size, styles, math, init))
+            .enumerate()
+            .map(|(i, word)| {
+                let g = self.words.get(i - 1).map_or(0, |w| w.glyphs.len() - 1);
+                let prev = self.get_guess(i - 1, g).or(prev.clone());
+                let next = self.get_guess(i + 1, 0).or(next.clone());
+
+                word.get_latex(&prev, &next)
+            })
             .collect::<Vec<String>>()
             .join(" ")
     }

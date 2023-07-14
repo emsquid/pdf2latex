@@ -134,7 +134,7 @@ impl Size {
         if self == Self::Normalsize {
             base
         } else {
-            format!("\\{self}{{{base}}}")
+            format!("{{\\{self} {base}}}")
         }
     }
 }
@@ -173,23 +173,6 @@ impl std::fmt::Display for Style {
 }
 
 impl Style {
-    pub fn all() -> Vec<Vec<Style>> {
-        vec![
-            vec![Style::Normal],
-            vec![Style::Bold],
-            vec![Style::Italic],
-            vec![Style::Slanted],
-            vec![Style::Bold, Style::Italic],
-            vec![Style::Bold, Style::Slanted],
-            vec![Style::SansSerif],
-            vec![Style::BlackBoard],
-            vec![Style::Calligraphic],
-            vec![Style::Fraktur],
-            vec![Style::Script],
-            vec![Style::EuScript],
-        ]
-    }
-
     pub fn text() -> Vec<Vec<Style>> {
         vec![
             vec![Style::Normal],
@@ -210,10 +193,6 @@ impl Style {
             vec![Style::Script],
             vec![Style::EuScript],
         ]
-    }
-
-    pub fn is_math(self) -> bool {
-        Self::math().iter().any(|style| style.contains(&self))
     }
 
     pub fn apply(self, base: String) -> String {
@@ -376,7 +355,8 @@ impl FontBase {
         let mut symbols = Vec::new();
         for chr in ALPHABET.chars() {
             symbols.push((chr.to_lowercase().to_string(), Style::text(), vec![], false));
-            symbols.push((chr.to_uppercase().to_string(), Style::all(), vec![], false));
+            symbols.push((chr.to_uppercase().to_string(), Style::text(), vec![], false));
+            symbols.push((chr.to_uppercase().to_string(), Style::math(), vec![], true));
             symbols.push((
                 chr.to_lowercase().to_string(),
                 vec![vec![Style::Normal]],
@@ -397,6 +377,20 @@ impl FontBase {
         }
 
         symbols
+    }
+
+    fn generate_punctuations() -> Vec<GlyphData> {
+        PUNCTUATIONS
+            .lines()
+            .map(|punct| (punct.to_string(), Style::text(), vec![], false))
+            .collect()
+    }
+
+    fn generate_ligatures() -> Vec<GlyphData> {
+        LIGATURES
+            .lines()
+            .map(|lig| (lig.to_string(), Style::text(), vec![], false))
+            .collect()
     }
 
     fn generate_accents() -> Vec<GlyphData> {
@@ -441,20 +435,6 @@ impl FontBase {
         }
 
         symbols
-    }
-
-    fn generate_punctuations() -> Vec<GlyphData> {
-        PUNCTUATIONS
-            .lines()
-            .map(|punct| (punct.to_string(), Style::text(), vec![], false))
-            .collect()
-    }
-
-    fn generate_ligatures() -> Vec<GlyphData> {
-        LIGATURES
-            .lines()
-            .map(|lig| (lig.to_string(), Style::text(), vec![], false))
-            .collect()
     }
 
     fn generate_greeks() -> Vec<GlyphData> {

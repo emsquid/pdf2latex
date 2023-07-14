@@ -1,6 +1,6 @@
-use crate::font::Style;
+use crate::pdf::Pdf;
+use crate::result::Result;
 use crate::utils::round;
-use crate::{font::Size, pdf::Pdf, result::Result};
 use std::path::PathBuf;
 
 pub struct Latex {
@@ -16,36 +16,22 @@ impl Latex {
             + "\n\\usepackage[margin="
             + &(round(margin, 1)).to_string()
             + "in]{geometry}"
-            + "\n\\usepackage{{amsmath, amssymb, amsthm}}"
-            + "\n\\usepackage{{euscript, mathrsfs}}"
+            + "\n\\usepackage{amsmath, amssymb, amsthm}"
+            + "\n\\usepackage{euscript, mathrsfs}"
             + "\n\\begin{document}";
 
         for page in &pdf.pages {
-            let mut init = true;
-            let mut math = false;
-            let mut current_size = Size::Normalsize;
-            let mut current_styles = Vec::new();
+            for (i, line) in page.lines.iter().enumerate() {
+                let w = page.lines.get(i - 1).map_or(0, |l| l.words.len() - 1);
+                let g = page
+                    .lines
+                    .get(i - 1)
+                    .map_or(0, |l| l.words[w].glyphs.len() - 1);
+                let prev = page.get_guess(i - 1, w, g);
+                let next = page.get_guess(i + 1, 0, 0);
 
-            for line in &page.lines {
                 content.push_str("\n    ");
-                content.push_str(&line.get_latex(
-                    &mut current_size,
-                    &mut current_styles,
-                    &mut math,
-                    &mut init,
-                ));
-            }
-
-            for style in current_styles {
-                if style.is_math() {
-                    content.push_str("}$");
-                } else if style != Style::Normal {
-                    content.push('}');
-                }
-            }
-
-            if math {
-                content.push('$');
+                content.push_str(&line.get_latex(&prev, &next));
             }
         }
 
