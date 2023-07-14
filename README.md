@@ -25,14 +25,14 @@ pdf2latex super_cool.pdf -o cooler.tex
 
 ## Notes 
 
-- The project currently requires `json` font files to recognize characters, ask us! 
-  These files should be placed in the following directories
+The project currently requires `json` font files to recognize characters, ask us! 
+These files should be placed in the following directories
   
-  |Platform | Value                                           | Example                                            |
-  | ------- | ----------------------------------------------- | -------------------------------------------------- |
-  | Linux   | `$XDG_CONFIG_HOME` or `$HOME`/.config/pdf2latex | /home/alice/.config/pdf2latex                      |
-  | macOS   | `$HOME`/Library/Application Support/pdf2latex   | /Users/Alice/Library/Application Support/pdf2latex |
-  | Windows | `{FOLDERID_RoamingAppData}`\pdf2latex           | C:\Users\Alice\AppData\Roaming\pdf2latex           |
+|Platform | Value                                           | Example                                            |
+| ------- | ----------------------------------------------- | -------------------------------------------------- |
+| Linux   | `$XDG_CONFIG_HOME` or `$HOME`/.config/pdf2latex | /home/alice/.config/pdf2latex                      |
+| macOS   | `$HOME`/Library/Application Support/pdf2latex   | /Users/Alice/Library/Application Support/pdf2latex |
+| Windows | `{FOLDERID_RoamingAppData}`\pdf2latex           | C:\Users\Alice\AppData\Roaming\pdf2latex           |
  
 ## Command line usage
 
