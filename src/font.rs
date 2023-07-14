@@ -15,6 +15,7 @@ const MATH_ACCENTS: &str = include_str!("data/math_accents.txt");
 const PUNCTUATIONS: &str = include_str!("data/punctuations.txt");
 const LIGATURES: &str = include_str!("data/ligatures.txt");
 const GREEKS: &str = include_str!("data/greeks.txt");
+const HEBREWS: &str = include_str!("data/hebrews.txt");
 const CONSTRUCTS: &str = include_str!("data/constructs.txt");
 const OPERATIONS: &str = include_str!("data/operations.txt");
 const ARROWS: &str = include_str!("data/arrows.txt");
@@ -456,6 +457,13 @@ impl FontBase {
             .collect()
     }
 
+    fn generate_hebrews() -> Vec<GlyphData> {
+        HEBREWS
+            .lines()
+            .map(|hebrew| (hebrew.to_string(), vec![vec![Style::Normal]], vec![], true))
+            .collect()
+    }
+
     fn generate_constructs() -> Vec<GlyphData> {
         let mut symbols = Vec::new();
         for construct in CONSTRUCTS.lines() {
@@ -508,6 +516,7 @@ impl FontBase {
         symbols.extend(Self::generate_accents());
 
         symbols.extend(Self::generate_greeks());
+        symbols.extend(Self::generate_hebrews());
         symbols.extend(Self::generate_constructs());
         symbols.extend(Self::generate_operations());
         symbols.extend(Self::generate_arrows());
