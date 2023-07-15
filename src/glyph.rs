@@ -177,7 +177,7 @@ impl KnownGlyph {
         let (_n_base, n_size, n_styles, _n_modifiers, n_math) =
             next.clone().unwrap_or(default.clone());
 
-        if size != p_size || (math && !p_math) || styles != p_styles {
+        if size != p_size || math != p_math || styles != p_styles {
             if size != Size::Normalsize && !math {
                 result.push_str(&format!("{{\\{size} "));
             }
@@ -203,7 +203,7 @@ impl KnownGlyph {
             result.push(' ');
         }
 
-        if size != n_size || (math && !n_math) || styles != n_styles {
+        if size != n_size || math != n_math || styles != n_styles {
             for &style in &styles {
                 if style != Style::Normal {
                     result.push('}');

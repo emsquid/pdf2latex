@@ -76,9 +76,11 @@ impl Word {
                     continue 'outer;
                 }
 
-                dist += self.glyphs[base_index - collapse_length]
-                    .dist
-                    .unwrap_or(f32::INFINITY);
+                dist = dist.max(
+                    self.glyphs[base_index - collapse_length]
+                        .dist
+                        .unwrap_or(f32::INFINITY),
+                );
 
                 joined = joined.join(&self.glyphs[base_index - collapse_length]);
                 joined.try_guess(fontbase, baseline, true);
