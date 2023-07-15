@@ -83,6 +83,8 @@ pub trait Glyph {
     }
 }
 
+type GlyphData = (String, Size, Vec<Style>, Vec<String>, bool);
+
 #[derive(Clone, bitcode::Encode, bitcode::Decode)]
 pub struct KnownGlyph {
     pub base: String,
@@ -108,40 +110,24 @@ impl Glyph for KnownGlyph {
 }
 
 impl KnownGlyph {
-    pub fn from(
-        base: &str,
-        code: Code,
-        size: Size,
-        styles: Vec<Style>,
-        modifiers: Vec<String>,
-        math: bool,
-        id: u32,
-    ) -> Result<KnownGlyph> {
-        let (image, offset) = Self::render(base, code, size, &styles, &modifiers, math, id)?;
+    pub fn from(data: GlyphData, code: Code, id: u32) -> Result<KnownGlyph> {
+        let (image, offset) = Self::render(data.clone(), code, id)?;
 
         Ok(KnownGlyph {
-            base: base.to_string(),
+            base: data.0,
             code,
-            size,
-            styles,
-            modifiers,
-            math,
+            size: data.1,
+            styles: data.2,
+            modifiers: data.3,
+            math: data.4,
             rect: Rect::new(0, 0, image.width(), image.height()),
             image: image.to_luma8().into_raw(),
             offset,
         })
     }
 
-    fn render(
-        base: &str,
-        code: Code,
-        size: Size,
-        styles: &[Style],
-        modifiers: &[String],
-        math: bool,
-        id: u32,
-    ) -> Result<(DynamicImage, i32)> {
-        let latex = Self::latex(base, size, styles, modifiers, math);
+    fn render(data: GlyphData, code: Code, id: u32) -> Result<(DynamicImage, i32)> {
+        let latex = Self::latex(data, &None, &None, true);
         let doc = format!(
             "\\documentclass[11pt, border=4pt]{{standalone}}
             \\usepackage{{amsmath, amssymb, amsthm}}
@@ -171,13 +157,69 @@ impl KnownGlyph {
         Ok(Self::find_glyph(&image))
     }
 
-    fn latex(base: &str, size: Size, styles: &[Style], modifiers: &[String], math: bool) -> String {
-        let mut result = modifiers.iter().fold(String::from(base), |acc, modif| {
-            format!("\\{modif}{{{acc}}}")
-        });
-        result = if math { format!("${result}$") } else { result };
-        result = styles.iter().fold(result, |acc, style| style.apply(acc));
-        size.apply(result)
+    fn latex(
+        data: GlyphData,
+        prev: &Option<GlyphData>,
+        next: &Option<GlyphData>,
+        end: bool,
+    ) -> String {
+        let mut result = String::new();
+        let default = (
+            String::new(),
+            Size::Normalsize,
+            vec![Style::Normal],
+            vec![],
+            false,
+        );
+        let (base, size, styles, modifiers, math) = data;
+        let (_p_base, p_size, p_styles, _p_modifiers, p_math) =
+            prev.clone().unwrap_or(default.clone());
+        let (_n_base, n_size, n_styles, _n_modifiers, n_math) =
+            next.clone().unwrap_or(default.clone());
+
+        if size != p_size || (math && !p_math) || styles != p_styles {
+            if size != Size::Normalsize && !math {
+                result.push_str(&format!("{{\\{size} "));
+            }
+
+            if math && !p_math {
+                result.push('$');
+            }
+
+            for &style in &styles {
+                if style != Style::Normal {
+                    result.push_str(&format!("\\{style}{{"));
+                }
+            }
+        }
+
+        result.push_str(
+            &modifiers
+                .iter()
+                .fold(base.clone(), |acc, modif| format!("\\{modif}{{{acc}}}")),
+        );
+
+        if base.starts_with('\\') && n_math && !end {
+            result.push(' ');
+        }
+
+        if size != n_size || (math && !n_math) || styles != n_styles {
+            for &style in &styles {
+                if style != Style::Normal {
+                    result.push('}');
+                }
+            }
+
+            if math && !n_math {
+                result.push('$');
+            }
+
+            if size != Size::Normalsize && !math {
+                result.push('}');
+            }
+        }
+
+        result
     }
 
     fn find_baseline(image: &DynamicImage) -> u32 {
@@ -206,62 +248,28 @@ impl KnownGlyph {
         (image.crop_imm(x, y, width, height), offset)
     }
 
+    pub fn get_data(&self) -> GlyphData {
+        (
+            self.base.clone(),
+            self.size,
+            self.styles.clone(),
+            self.modifiers.clone(),
+            self.math,
+        )
+    }
+
     pub fn get_latex(
         &self,
         prev: &Option<KnownGlyph>,
         next: &Option<KnownGlyph>,
         end: bool,
     ) -> String {
-        let mut result = String::new();
-        let default = (Size::Normalsize, vec![Style::Normal], false);
-
-        let (size, styles, math) = prev.clone().map_or(default.clone(), |glyph| {
-            (glyph.size, glyph.styles, glyph.math)
-        });
-
-        if self.size != size && self.size != Size::Normalsize && !math {
-            result.push_str(&format!("{{\\{} ", self.size));
-        }
-
-        if self.math && !math {
-            result.push('$');
-        }
-
-        for style in &self.styles {
-            if !styles.contains(style) && *style != Style::Normal {
-                result.push_str(&format!("\\{style}{{"));
-            }
-        }
-
-        result.push_str(
-            &self.modifiers.iter().fold(self.base.clone(), |acc, modif| {
-                format!("\\{modif}{{{acc}}}")
-            }),
-        );
-
-        let (size, styles, math) = next.clone().map_or(default.clone(), |glyph| {
-            (glyph.size, glyph.styles, glyph.math)
-        });
-
-        if self.base.starts_with('\\') && !end {
-            result.push(' ');
-        }
-
-        for style in &self.styles {
-            if !styles.contains(style) && *style != Style::Normal {
-                result.push('}');
-            }
-        }
-
-        if self.math && !math {
-            result.push('$');
-        }
-
-        if self.size != size && self.size != Size::Normalsize && !self.math {
-            result.push('}');
-        }
-
-        result
+        Self::latex(
+            self.get_data(),
+            &prev.clone().map(|glyph| glyph.get_data()),
+            &next.clone().map(|glyph| glyph.get_data()),
+            end,
+        )
     }
 }
 
@@ -372,10 +380,6 @@ impl UnknownGlyph {
                     }
                 }
             }
-        }
-
-        if aligned && self.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
-            self.try_guess(fontbase, baseline, false);
         }
     }
 }

@@ -69,19 +69,18 @@ impl Word {
                 continue 'outer;
             }
 
+            let mut joined = self.glyphs[base_index].clone();
             let mut dist = self.glyphs[base_index].dist.unwrap_or(f32::INFINITY);
             for collapse_length in 1..=2 {
                 if base_index < collapse_length {
                     continue 'outer;
                 }
+
                 dist += self.glyphs[base_index - collapse_length]
                     .dist
                     .unwrap_or(f32::INFINITY);
 
-                let mut joined = self.glyphs[base_index].clone();
-                for i in 1..=collapse_length {
-                    joined = joined.join(&self.glyphs[base_index - i]);
-                }
+                joined = joined.join(&self.glyphs[base_index - collapse_length]);
                 joined.try_guess(fontbase, baseline, true);
 
                 if joined.dist.unwrap_or(f32::INFINITY) < dist {

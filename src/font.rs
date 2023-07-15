@@ -129,14 +129,6 @@ impl Size {
         }
         .to_string()
     }
-
-    pub fn apply(self, base: String) -> String {
-        if self == Self::Normalsize {
-            base
-        } else {
-            format!("{{\\{self} {base}}}")
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, bitcode::Encode, bitcode::Decode)]
@@ -194,20 +186,10 @@ impl Style {
             vec![Style::EuScript],
         ]
     }
-
-    pub fn apply(self, base: String) -> String {
-        if self == Self::Normal {
-            base
-        } else if Self::math().iter().any(|style| style.contains(&self)) {
-            let base = base.replace('$', "");
-            format!("$\\{self}{{{base}}}$")
-        } else {
-            format!("\\{self}{{{base}}}")
-        }
-    }
 }
 
 type GlyphData = (String, Vec<Vec<Style>>, Vec<String>, bool);
+
 pub struct FontBase {
     pub glyphs: HashMap<Code, HashMap<(u32, u32), Vec<KnownGlyph>>>,
 }
@@ -269,21 +251,13 @@ impl FontBase {
                 let mut handles = Vec::new();
                 for (base, styles, modifiers, math) in symbols.clone() {
                     for style in styles.clone() {
-                        if glyphs.iter().any(|g| {
-                            g.base == base
-                                && g.size == size
-                                && g.styles == style
-                                && g.modifiers == modifiers
-                                && g.math == math
-                        }) {
+                        let data = (base.clone(), size, style, modifiers.clone(), math);
+
+                        if glyphs.iter().any(|g| g.get_data() == data) {
                             continue;
                         }
 
-                        let base = base.clone();
-                        let modifiers = modifiers.clone();
-                        handles.push(scope.spawn(move || {
-                            KnownGlyph::from(&base, code, size, style, modifiers, math, id as u32)
-                        }));
+                        handles.push(scope.spawn(move || KnownGlyph::from(data, code, id as u32)));
 
                         if handles.len() >= 4 {
                             let glyph = handles.remove(0).join().unwrap()?;
@@ -323,6 +297,7 @@ impl FontBase {
 
         if args.verbose {
             log(&format!("CREATED FONT {code}\n"), None, None, "1m")?;
+            std::io::stdout().write_all(b"\n")?;
         }
 
         Ok(())
@@ -344,7 +319,7 @@ impl FontBase {
         }
 
         if args.verbose {
-            log(&format!("loaded font {code}"), Some(1.), None, "u")?;
+            log(&format!("loading font {code}"), Some(1.), None, "u")?;
             std::io::stdout().write_all(b"\n")?;
         }
 
