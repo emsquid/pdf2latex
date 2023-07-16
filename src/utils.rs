@@ -7,6 +7,7 @@ use std::path::Path;
 use std::process::Command;
 use std::{collections::HashMap, hash::Hash};
 
+/// A Rectangle in 2D
 #[derive(Clone, Copy, Debug, bitcode::Encode, bitcode::Decode)]
 pub struct Rect {
     pub x: u32,
@@ -16,6 +17,7 @@ pub struct Rect {
 }
 
 impl Rect {
+    /// Create a new Rect with the given coordinates and dimensions
     pub fn new(x: u32, y: u32, width: u32, height: u32) -> Rect {
         Rect {
             x,
@@ -25,21 +27,26 @@ impl Rect {
         }
     }
 
+    /// Crop an image with the Rect
     pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
         image.crop_imm(self.x, self.y, self.width, self.height)
     }
 }
 
-fn split(buffer: &[u8], delimiter: u8) -> Vec<&[u8]> {
-    buffer.split(|&b| b == delimiter).collect()
+/// Split a slice based on a delimiter
+fn split<T: PartialEq>(buffer: &[T], delimiter: T) -> Vec<&[T]> {
+    buffer.split(|b| b == &delimiter).collect()
 }
 
+/// Convert a slice of u8 to an usize
 fn buffer_to_usize(buffer: &[u8]) -> Result<usize> {
     let result = String::from_utf8_lossy(buffer).parse()?;
 
     Ok(result)
 }
 
+/// Convert a slice of u8 to ppm images
+/// (Need to be reworked)
 fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
     let mut images = Vec::new();
     let mut start = 0;
@@ -58,6 +65,7 @@ fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
     Ok(images)
 }
 
+/// Convert a pdf to images
 pub fn pdf_to_images(path: &Path) -> Result<Vec<DynamicImage>> {
     let output = Command::new("pdftoppm")
         .args(["-r", "512", &path.to_string_lossy()])
@@ -68,44 +76,55 @@ pub fn pdf_to_images(path: &Path) -> Result<Vec<DynamicImage>> {
     }
 }
 
+/// Find the different black parts in an image with the given spacing
 pub fn find_parts(gray: &GrayImage, spacing: u32) -> Vec<(u32, u32)> {
     let mut parts = Vec::new();
 
     let mut start = 0;
     let mut end = 0;
+    let mut in_part = false;
 
     for (i, row) in gray.enumerate_rows() {
+        // Compute the average grayscale of the row
         let average = row.fold(0, |acc, line| acc + u32::from(line.2 .0[0])) / gray.width();
-        if start != 0 && average == 255 {
+        if in_part && average == 255 {
+            // If we are in a part and the row is white
+            // Set the end of the part if not set
             if end == 0 {
                 end = i;
             }
+            // Check if the end of the part is spaced enough
             if i - (end) >= spacing {
                 parts.push((start, end - 1));
-                start = 0;
+                in_part = false;
             }
         } else if average != 255 {
+            // Else reset the end
             end = 0;
-            if start == 0 {
+            // And start a new part if not started
+            if !in_part {
                 start = i;
+                in_part = true;
             }
         }
     }
 
-    if start != 0 {
+    // Add the last part if needed
+    if in_part {
         parts.push((start, gray.height()));
     }
 
     parts
 }
 
+/// Compute a flood fill from start with the given threshold
 pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Vec<(u32, u32)> {
     let mut pixels = start;
     let mut index = 0;
 
     while index < pixels.len() {
         let (x, y) = pixels[index];
-
+        // Extend the flood fill from this pixel if it passes the threshold
         if gray[(x, y)].0[0] <= threshold {
             for dx in -1..2 {
                 for dy in -1..2 {
@@ -122,14 +141,14 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
                 }
             }
         }
-
         index += 1;
     }
 
     pixels
 }
 
-pub fn average<T: Eq + Hash>(list: Vec<T>, default: T) -> T {
+/// Find the value that appears most often in list
+pub fn mode<T: Eq + Hash>(list: Vec<T>, default: T) -> T {
     let mut count = HashMap::new();
     for key in list {
         count.entry(key).or_insert(0).add_assign(1);
@@ -142,6 +161,12 @@ pub fn average<T: Eq + Hash>(list: Vec<T>, default: T) -> T {
         .0
 }
 
+/// Round a value to a certain number of digits
+pub fn round(value: f32, digits: u32) -> f32 {
+    (value * (10.0_f32).powi(digits as i32)).round() / 10.0_f32.powi(digits as i32)
+}
+
+/// Print a logging message to stdout
 pub fn log(
     message: &str,
     progress: Option<f32>,
@@ -183,8 +208,4 @@ pub fn log(
     stdout.flush()?;
 
     Ok(())
-}
-
-pub fn round(value: f32, digits: u32) -> f32 {
-    (value * (10.0_f32).powi(digits as i32)).round() / 10.0_f32.powi(digits as i32)
 }

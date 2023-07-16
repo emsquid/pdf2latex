@@ -12,12 +12,22 @@ use std::time;
 
 const LINE_SPACING: u32 = 10;
 
+/// A Page from a Pdf, it holds an image and multiple lines
 pub struct Page {
     pub image: DynamicImage,
     pub lines: Vec<Line>,
 }
 
 impl Page {
+    /// Create a Page from an image
+    pub fn from(image: &DynamicImage) -> Page {
+        Page {
+            image: image.clone(),
+            lines: Page::find_lines(image),
+        }
+    }
+
+    /// Find the different lines in an image
     fn find_lines(image: &DynamicImage) -> Vec<Line> {
         find_parts(&image.to_luma8(), LINE_SPACING)
             .into_iter()
@@ -28,54 +38,38 @@ impl Page {
             .collect()
     }
 
-    pub fn from(image: &DynamicImage) -> Page {
-        Page {
-            image: image.clone(),
-            lines: Page::find_lines(image),
-        }
-    }
-
+    /// Guess the content of a Page
     pub fn guess(&mut self, fontbase: &FontBase, args: &Args) -> Result<()> {
+        // We use a thread scope to ensure that variables live long enough
         std::thread::scope(|scope| -> Result<()> {
-            let mut now = time::Instant::now();
+            let now = time::Instant::now();
             let mut progress = 0.;
             let step = 1. / self.lines.len() as f32;
-
             if args.verbose {
-                log("creating threads", Some(0.), None, "s")?;
+                log("converting text", Some(0.), None, "s")?;
             }
 
+            // Handles to store threads
             let mut handles = Vec::new();
             for line in &mut self.lines {
+                // Use a thread to guess the content of several lines concurrently
                 let handle = scope.spawn(move || line.guess(fontbase));
                 handles.push(handle);
 
-                progress += step;
-                if args.verbose {
-                    log("creating threads", Some(progress), None, "u")?;
+                // Control the number of threads created
+                if handles.len() >= args.threads {
+                    handles.remove(0).join().unwrap();
                 }
-            }
-
-            let duration = now.elapsed().as_secs_f32();
-            if args.verbose {
-                log("creating threads", Some(1.), Some(duration), "u")?;
-            }
-
-            now = time::Instant::now();
-            progress = 0.;
-
-            if args.verbose {
-                std::io::stdout().write_all(b"\n\x1b[s")?;
-                log("converting text", Some(0.), None, "u")?;
-            }
-
-            for handle in handles {
-                handle.join().unwrap();
 
                 progress += step;
                 if args.verbose {
                     log("converting text", Some(progress), None, "u")?;
                 }
+            }
+
+            // Join all threads
+            for handle in handles {
+                handle.join().unwrap();
             }
 
             let duration = now.elapsed().as_secs_f32();
@@ -88,6 +82,7 @@ impl Page {
         })
     }
 
+    /// Get the content of a Page, mostly for debugging
     pub fn get_content(&self) -> String {
         self.lines
             .iter()
@@ -96,7 +91,23 @@ impl Page {
             .join("\n")
     }
 
+    /// Get the LaTeX for a Page
+    pub fn get_latex(&self) -> String {
+        self.lines
+            .iter()
+            .enumerate()
+            .map(|(i, line)| {
+                let prev = self.lines.get(i - 1).and_then(Line::get_last_guess);
+                let next = self.lines.get(i + 1).and_then(Line::get_first_guess);
+
+                format!("\n    {}", line.get_latex(&prev, &next))
+            })
+            .collect()
+    }
+
+    /// Show the guess on the Page's image, mostly for debugging
     pub fn debug_image(&self) -> DynamicImage {
+        // idk wtf is going on here, ask Noe
         let mut copy = self.image.clone();
         let mut alt = 0;
         for line in &self.lines {
@@ -166,6 +177,7 @@ impl Page {
         copy
     }
 
+    /// Compute the average distance between glyphs and their guesses, mostly for debugging
     pub fn debug_dist_avg(&self) {
         let data = self.lines.iter().fold((0., 0), |acc, line| {
             (acc.0 + line.get_dist_sum(), acc.1 + line.get_glyph_count())
@@ -174,19 +186,23 @@ impl Page {
     }
 }
 
+/// A Pdf document represented as multiple pages
 pub struct Pdf {
     pub pages: Vec<Page>,
 }
 
 impl Pdf {
+    /// Load a Pdf from the given path
     pub fn load(path: &Path) -> Result<Pdf> {
         let pages = pdf_to_images(path)?.iter().map(Page::from).collect();
 
         Ok(Pdf { pages })
     }
 
+    /// Guess the content of a Pdf
     pub fn guess(&mut self, args: &Args) -> Result<()> {
-        let fontbase = FontBase::new(args)?;
+        // The FontBase is needed to compare glyphs
+        let fontbase = FontBase::from(args)?;
 
         for (i, page) in self.pages.iter_mut().enumerate() {
             if args.verbose {
@@ -203,17 +219,7 @@ impl Pdf {
         Ok(())
     }
 
-    pub fn get_content(&self) -> String {
-        let content = self
-            .pages
-            .iter()
-            .map(Page::get_content)
-            .collect::<Vec<String>>()
-            .join("\n");
-
-        content
-    }
-
+    /// Compute the overall margin of a Pdf
     pub fn get_margin(&self) -> f32 {
         self.pages
             .iter()
@@ -227,5 +233,19 @@ impl Pdf {
             .min()
             .unwrap_or(0) as f32
             / 512.
+    }
+
+    /// Get the content of a Pdf, mostly for debugging
+    pub fn get_content(&self) -> String {
+        self.pages
+            .iter()
+            .map(Page::get_content)
+            .collect::<Vec<String>>()
+            .join("\n")
+    }
+
+    /// Get the LateX of a Pdf
+    pub fn get_latex(&self) -> String {
+        self.pages.iter().map(Page::get_latex).collect()
     }
 }
