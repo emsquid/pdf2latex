@@ -202,7 +202,7 @@ impl Pdf {
     /// Guess the content of a Pdf
     pub fn guess(&mut self, args: &Args) -> Result<()> {
         // The FontBase is needed to compare glyphs
-        let fontbase = FontBase::from(args)?;
+        let fontbase = FontBase::try_from(args)?;
 
         for (i, page) in self.pages.iter_mut().enumerate() {
             if args.verbose {

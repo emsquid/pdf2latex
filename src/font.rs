@@ -215,7 +215,7 @@ impl FontBase {
     }
 
     /// Create a FontBase based on the given arguments
-    pub fn from(args: &Args) -> Result<FontBase> {
+    pub fn try_from(args: &Args) -> Result<FontBase> {
         // Create the font family if needed
         if let Some(codes) = &args.create {
             for &code in codes {
@@ -291,7 +291,7 @@ impl FontBase {
                         }
 
                         // Use a thread to create several glyphs concurrently
-                        handles.push(scope.spawn(move || KnownGlyph::from(data, id)));
+                        handles.push(scope.spawn(move || KnownGlyph::try_from(data, id)));
 
                         // Control the number of threads created
                         if handles.len() >= args.threads {

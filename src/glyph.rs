@@ -124,7 +124,7 @@ impl Glyph for KnownGlyph {
 
 impl KnownGlyph {
     /// Create a KnownGlyph from the given data, code and id
-    pub fn from(data: GlyphData, id: usize) -> Result<KnownGlyph> {
+    pub fn try_from(data: GlyphData, id: usize) -> Result<KnownGlyph> {
         let (image, offset) = Self::render(data.clone(), id)?;
 
         Ok(KnownGlyph {
