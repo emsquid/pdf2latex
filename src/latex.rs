@@ -1,6 +1,6 @@
-use crate::pdf::Pdf;
-use crate::result::Result;
-use crate::utils::round;
+use utils::utils::round;
+
+use crate::{pdf::Pdf, result::Result};
 use std::path::PathBuf;
 
 /// A LaTeX document represented in a String

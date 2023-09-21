@@ -1,13 +1,7 @@
-use crate::args::Args;
-use crate::glyph::KnownGlyph;
-use crate::result::Result;
-use crate::utils::log;
-use bitcode::Encode;
-use clap::ValueEnum;
-use std::collections::HashMap;
-use std::io::Write;
-use std::path::PathBuf;
-use std::{time, vec};
+use crate::{
+    args::Args, code::Code, glyph::KnownGlyph, result::Result, size::Size, style::Style, utils::log,
+};
+use std::{collections::HashMap, io::Write, time, vec};
 
 const ALPHABET: &str = "abcdefghijklmnopqrstuvwxyz";
 const ACCENTS: &str = include_str!("data/accents.txt");
@@ -20,184 +14,6 @@ const CONSTRUCTS: &str = include_str!("data/constructs.txt");
 const OPERATIONS: &str = include_str!("data/operations.txt");
 const ARROWS: &str = include_str!("data/arrows.txt");
 const MISCELLANEOUS: &str = include_str!("data/miscellaneous.txt");
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, ValueEnum, Encode, bitcode::Decode)]
-pub enum Code {
-    Cmr,
-    Lmr,
-    Put,
-    Qag,
-    Qcr,
-    Qcs,
-    Qpl,
-}
-
-impl std::fmt::Display for Code {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let string = match self {
-            Code::Cmr => "cmr",
-            Code::Lmr => "lmr",
-            Code::Put => "put",
-            Code::Qag => "qag",
-            Code::Qcr => "qcr",
-            Code::Qcs => "qcs",
-            Code::Qpl => "qpl",
-        };
-        write!(f, "{string}")
-    }
-}
-
-impl Code {
-    pub fn all() -> Vec<Code> {
-        vec![
-            Code::Cmr,
-            Code::Lmr,
-            Code::Put,
-            Code::Qag,
-            Code::Qcr,
-            Code::Qcs,
-            Code::Qpl,
-        ]
-    }
-
-    pub fn as_path(self) -> String {
-        let config = dirs::config_dir().unwrap_or(PathBuf::from("~/.config"));
-        format!("{}/pdf2latex/{self}", config.display())
-    }
-}
-
-/// An enum representing the different LaTeX sizes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, bitcode::Encode, bitcode::Decode)]
-pub enum Size {
-    Tiny,
-    Scriptsize,
-    Footnotesize,
-    Small,
-    Normalsize,
-    Large,
-    LLarge,
-    LLLarge,
-    Huge,
-    HHuge,
-}
-
-impl std::fmt::Display for Size {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = match self {
-            Size::Tiny => "tiny",
-            Size::Scriptsize => "scriptsize",
-            Size::Footnotesize => "footnotesize",
-            Size::Small => "small",
-            Size::Normalsize => "normalsize",
-            Size::Large => "large",
-            Size::LLarge => "Large",
-            Size::LLLarge => "LARGE",
-            Size::Huge => "huge",
-            Size::HHuge => "Huge",
-        };
-        write!(f, "{string}")
-    }
-}
-
-impl Size {
-    /// Create an iterator over all possible sizes
-    pub fn all() -> Vec<Size> {
-        vec![
-            Size::Normalsize,
-            Size::Small,
-            Size::Large,
-            Size::Footnotesize,
-            Size::LLarge,
-            Size::Scriptsize,
-            Size::Tiny,
-            Size::LLLarge,
-            Size::Huge,
-            Size::HHuge,
-        ]
-    }
-
-    /// Convert a size to a decent file path
-    pub fn as_path(self) -> String {
-        match self {
-            Size::Tiny => "tiny",
-            Size::Scriptsize => "scriptsize",
-            Size::Footnotesize => "footnotesize",
-            Size::Small => "small",
-            Size::Normalsize => "normalsize",
-            Size::Large => "large",
-            Size::LLarge => "llarge",
-            Size::LLLarge => "lllarge",
-            Size::Huge => "huge",
-            Size::HHuge => "hhuge",
-        }
-        .to_string()
-    }
-}
-
-/// An enum representing different LaTeX styles
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, bitcode::Encode, bitcode::Decode)]
-pub enum Style {
-    Normal,
-    Bold,
-    Italic,
-    Slanted,
-    // Underlined,
-    SansSerif,
-    BlackBoard,
-    Calligraphic,
-    Fraktur,
-    Script,
-    EuScript,
-}
-
-impl std::fmt::Display for Style {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = match self {
-            Style::Normal => "textnormal",
-            Style::Bold => "textbf",
-            Style::Italic => "textit",
-            Style::Slanted => "textsl",
-            Style::SansSerif => "textsf",
-            Style::BlackBoard => "mathbb",
-            Style::Calligraphic => "mathcal",
-            Style::Fraktur => "mathfrak",
-            Style::Script => "mathscr",
-            Style::EuScript => "EuScript",
-        };
-        write!(f, "{string}")
-    }
-}
-
-impl Style {
-    /// Create an iterator over normal style only
-    pub fn basic() -> Vec<Vec<Style>> {
-        vec![vec![Style::Normal]]
-    }
-
-    /// Create an iterator over text styles
-    pub fn text() -> Vec<Vec<Style>> {
-        vec![
-            vec![Style::Normal],
-            vec![Style::Bold],
-            vec![Style::Italic],
-            vec![Style::Slanted],
-            vec![Style::Bold, Style::Italic],
-            vec![Style::Bold, Style::Slanted],
-            vec![Style::SansSerif],
-        ]
-    }
-
-    /// Create an iterator over math styles
-    pub fn math() -> Vec<Vec<Style>> {
-        vec![
-            vec![Style::BlackBoard],
-            vec![Style::Calligraphic],
-            vec![Style::Fraktur],
-            vec![Style::Script],
-            vec![Style::EuScript],
-        ]
-    }
-}
 
 type GlyphData = (String, Vec<Vec<Style>>, Vec<String>, bool);
 
@@ -216,31 +32,41 @@ impl FontBase {
 
     /// Create a FontBase based on the given arguments
     pub fn try_from(args: &Args) -> Result<FontBase> {
-        // Create the font family if needed
-        if let Some(codes) = &args.create {
-            for &code in codes {
-                Self::create_family(code, args)?;
+        match args {
+            Args::FontBaseArgs(_) => {
+                // Create the font family
+                match args.create() {
+                    Some(codes) => {
+                        for &code in codes {
+                            Self::create_family(code, args)?;
+                        }
+                    }
+                    None => {
+                        println!("Please, provide fonts to generate");
+                    }
+                };
+                Ok(FontBase::new())
+            }
+            Args::MainArgs(_) => {
+                let now = time::Instant::now();
+                if args.verbose() {
+                    log("LOADING FONTS\n", None, None, "1m")?;
+                }
+
+                // Load each family into the FontBase
+                let mut fontbase = FontBase::new();
+                for code in Code::all() {
+                    fontbase.glyphs.insert(code, Self::load_family(code, args)?);
+                }
+
+                let duration = now.elapsed().as_secs_f32();
+                if args.verbose() {
+                    log("LOADED FONTS", None, Some(duration), "1m")?;
+                    std::io::stdout().write_all(b"\n")?;
+                }
+                Ok(fontbase)
             }
         }
-
-        let now = time::Instant::now();
-        if args.verbose {
-            log("LOADING FONTS\n", None, None, "1m")?;
-        }
-
-        // Load each family into the FontBase
-        let mut fontbase = FontBase::new();
-        for code in Code::all() {
-            fontbase.glyphs.insert(code, Self::load_family(code, args)?);
-        }
-
-        let duration = now.elapsed().as_secs_f32();
-        if args.verbose {
-            log("LOADED FONTS", None, Some(duration), "1m")?;
-            std::io::stdout().write_all(b"\n")?;
-        }
-
-        Ok(fontbase)
     }
 
     /// Get the glyphs stored for the given family and size
@@ -256,7 +82,7 @@ impl FontBase {
 
     /// Create and store the glyphs for the given family
     fn create_family(code: Code, args: &Args) -> Result<()> {
-        if args.verbose {
+        if args.verbose() {
             log(&format!("CREATING FONT {code}\n"), None, None, "1m")?;
         }
 
@@ -270,7 +96,7 @@ impl FontBase {
 
             // We create a different file for each size
             for size in Size::all() {
-                if args.verbose {
+                if args.verbose() {
                     log(&size.to_string(), Some(0.), None, "s")?;
                 }
 
@@ -281,9 +107,16 @@ impl FontBase {
                 let mut id = glyphs.len();
                 // Handles to store threads
                 let mut handles = Vec::new();
-                for (base, styles, modifiers, math) in symbols.clone() {
-                    for style in styles.clone() {
-                        let data = (base.clone(), code, size, style, modifiers.clone(), math);
+                for (base, styles, modifiers, math) in &symbols {
+                    for style in styles {
+                        let data = (
+                            base.clone(),
+                            code,
+                            size,
+                            style.clone(),
+                            modifiers.clone(),
+                            *math,
+                        );
 
                         // Don't recreate glyphs with the same data
                         if glyphs.iter().any(|g| g.get_data() == data) {
@@ -294,7 +127,7 @@ impl FontBase {
                         handles.push(scope.spawn(move || KnownGlyph::try_from(data, id)));
 
                         // Control the number of threads created
-                        if handles.len() >= args.threads {
+                        if handles.len() >= args.threads() {
                             let glyph = handles.remove(0).join().unwrap()?;
                             glyphs.push(glyph);
 
@@ -303,7 +136,7 @@ impl FontBase {
                             std::fs::write(format!("{}/{}", code.as_path(), size.as_path()), bit)?;
                         }
 
-                        if args.verbose {
+                        if args.verbose() {
                             let progress = id as f32 / count as f32;
                             log(&size.to_string(), Some(progress), None, "u")?;
                         }
@@ -322,7 +155,7 @@ impl FontBase {
                 let bit = bitcode::encode(&glyphs)?;
                 std::fs::write(format!("{}/{}", code.as_path(), size.as_path()), bit)?;
 
-                if args.verbose {
+                if args.verbose() {
                     log(&size.to_string(), Some(1.), None, "u")?;
                     std::io::stdout().write_all(b"\n")?;
                 }
@@ -333,7 +166,7 @@ impl FontBase {
             Ok(())
         })?;
 
-        if args.verbose {
+        if args.verbose() {
             log(&format!("CREATED FONT {code}\n"), None, None, "1m")?;
             std::io::stdout().write_all(b"\n")?;
         }
@@ -343,7 +176,7 @@ impl FontBase {
 
     /// Load the glyphs for a family sorted by dimensions
     fn load_family(code: Code, args: &Args) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
-        if args.verbose {
+        if args.verbose() {
             log(&format!("loading font {code}"), Some(0.), None, "s")?;
         }
 
@@ -358,7 +191,7 @@ impl FontBase {
             }
         }
 
-        if args.verbose {
+        if args.verbose() {
             log(&format!("loading font {code}"), Some(1.), None, "u")?;
             std::io::stdout().write_all(b"\n")?;
         }

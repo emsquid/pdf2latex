@@ -1,14 +1,11 @@
-use crate::args::Args;
-use crate::font::FontBase;
-use crate::glyph::Glyph;
-use crate::result::Result;
-use crate::text::Line;
-use crate::utils::{find_parts, log, pdf_to_images, Rect};
-use image::imageops::overlay;
-use image::{DynamicImage, GenericImage, Rgba};
-use std::io::Write;
-use std::path::Path;
-use std::time;
+use crate::{args::Args, result::Result, text::Line};
+use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
+use std::{io::Write, path::Path, time};
+use utils::{
+    font::FontBase,
+    glyph::Glyph,
+    utils::{find_parts, log, pdf_to_images, Rect},
+};
 
 const LINE_SPACING: u32 = 10;
 
@@ -45,7 +42,7 @@ impl Page {
             let now = time::Instant::now();
             let mut progress = 0.;
             let step = 1. / self.lines.len() as f32;
-            if args.verbose {
+            if args.verbose() {
                 log("converting text", Some(0.), None, "s")?;
             }
 
@@ -57,12 +54,12 @@ impl Page {
                 handles.push(handle);
 
                 // Control the number of threads created
-                if handles.len() >= args.threads {
+                if handles.len() >= args.threads() {
                     handles.remove(0).join().unwrap();
                 }
 
                 progress += step;
-                if args.verbose {
+                if args.verbose() {
                     log("converting text", Some(progress), None, "u")?;
                 }
             }
@@ -73,7 +70,7 @@ impl Page {
             }
 
             let duration = now.elapsed().as_secs_f32();
-            if args.verbose {
+            if args.verbose() {
                 log("converting text", Some(1.), Some(duration), "u")?;
                 std::io::stdout().write_all(b"\n")?;
             }
@@ -205,14 +202,14 @@ impl Pdf {
         let fontbase = FontBase::try_from(args)?;
 
         for (i, page) in self.pages.iter_mut().enumerate() {
-            if args.verbose {
+            if args.verbose() {
                 log(&format!("\nPAGE {i}\n"), None, None, "1m")?;
             }
 
             page.guess(&fontbase, args)?;
         }
 
-        if args.verbose {
+        if args.verbose() {
             std::io::stdout().write_all(b"\n")?;
         }
 

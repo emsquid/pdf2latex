@@ -1,21 +1,22 @@
 use clap::Parser;
+use utils::{
+    args::{self, Args},
+    result,
+};
 
-mod args;
-mod font;
-mod glyph;
+// mod args;
 mod latex;
 mod pdf;
-mod result;
 mod text;
-mod utils;
 
 /// Process the arguments given by the user
-fn process(args: &args::Args) -> result::Result<()> {
+fn process(args: &args::MainArgs) -> result::Result<()> {
+    let main_args = Args::MainArgs(args);
     // Load the pdf
     let mut pdf = pdf::Pdf::load(&args.input)?;
 
     // Guess its content and either save it or print it
-    pdf.guess(args)?;
+    pdf.guess(&main_args)?;
     match &args.output {
         Some(output) => latex::LaTeX::from(&pdf).save(output)?,
         None => println!("{}", pdf.get_content()),
@@ -29,7 +30,7 @@ fn process(args: &args::Args) -> result::Result<()> {
 }
 
 fn main() {
-    if let Err(err) = process(&args::Args::parse()) {
+    if let Err(err) = process(&args::MainArgs::parse()) {
         eprintln!("{err}");
     }
 }

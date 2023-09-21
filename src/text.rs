@@ -1,8 +1,11 @@
-use crate::font::FontBase;
-use crate::glyph::{Glyph, KnownGlyph, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD};
-use crate::glyph::{UnknownGlyph, CHAR_THRESHOLD};
-use crate::utils::{find_parts, mode, Rect};
 use image::DynamicImage;
+use utils::{
+    font::FontBase,
+    glyph::{
+        Glyph, KnownGlyph, UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD,
+    },
+    utils::{find_parts, mode, Rect},
+};
 
 const WORD_SPACING: u32 = 15;
 

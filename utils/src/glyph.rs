@@ -1,9 +1,13 @@
-use crate::font::{Code, FontBase, Size, Style};
-use crate::result::Result;
-use crate::utils::{find_parts, flood_fill, Rect};
+use crate::{
+    code::Code,
+    font::FontBase,
+    result::Result,
+    size::Size,
+    style::Style,
+    utils::{find_parts, flood_fill, Rect},
+};
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
-use std::collections::HashMap;
-use std::process::Command;
+use std::{collections::HashMap, process::Command};
 
 pub const DIST_UNALIGNED_THRESHOLD: f32 = 32.;
 pub const DIST_THRESHOLD: f32 = 8.;
@@ -395,6 +399,7 @@ impl UnknownGlyph {
     /// Try to find the closest KnownGlyph to this UnknownGlyph in a FontBase
     pub fn try_guess(&mut self, fontbase: &FontBase, baseline: u32, aligned: bool) {
         let mut closest = self.dist.unwrap_or(f32::INFINITY);
+        let mut current_guess: Option<&KnownGlyph> = None;
         'outer: for family in fontbase.glyphs.values() {
             // We compare the glyph with every glyph which have similar dimensions
             for dw in [0, -1, 1, -2, 2] {
@@ -412,8 +417,8 @@ impl UnknownGlyph {
 
                             if dist < closest {
                                 closest = dist;
-                                self.dist = Some(dist);
-                                self.guess = Some(glyph.clone());
+                                let _ = self.dist.insert(dist);
+                                let _ = current_guess.insert(glyph);
                             }
 
                             if dist < DIST_THRESHOLD {
@@ -424,5 +429,6 @@ impl UnknownGlyph {
                 }
             }
         }
+        self.guess = current_guess.cloned();
     }
 }
