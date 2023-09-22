@@ -1,11 +1,9 @@
 use clap::Parser;
-use pdf2latex::utils::{
-    args::{Args, MainArgs},
-    result::Result,
-};
+use pdf2latex::utils::args::{Args, MainArgs};
 mod latex;
 mod pdf;
 mod text;
+use anyhow::Result;
 
 /// Process the arguments given by the user
 fn process(args: MainArgs) -> Result<()> {

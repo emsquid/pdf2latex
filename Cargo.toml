@@ -8,6 +8,7 @@ name = "pdf2latex-fonts"
 path = "src/bin/fonts.rs"
 
 [dependencies]
+anyhow = "1.0.75"
 bitcode = "0.4.0"
 clap = { version = "4.3.5", features = ["derive"] }
 dirs = "5.0.1"

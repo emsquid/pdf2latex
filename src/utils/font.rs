@@ -1,6 +1,5 @@
-use super::{
-    args::Args, code::Code, glyph::KnownGlyph, result::Result, size::Size, style::Style, utils::log,
-};
+use super::{args::Args, code::Code, glyph::KnownGlyph, size::Size, style::Style, utils::log};
+use anyhow::Result;
 use std::{collections::HashMap, io::Write, time, vec};
 
 const ALPHABET: &str = "abcdefghijklmnopqrstuvwxyz";

@@ -1,4 +1,4 @@
-use super::result::{Error, Result};
+use anyhow::{anyhow, Result};
 use image::{DynamicImage, GrayImage};
 use std::cmp::Ordering;
 use std::io::Write;
@@ -72,7 +72,7 @@ pub fn pdf_to_images(path: &Path) -> Result<Vec<DynamicImage>> {
         .output()?;
     match output.stderr.len() {
         0 => buffer_to_ppm(&output.stdout),
-        _ => Err(Error::Custom("Format error: This is not a PDF")),
+        _ => Err(anyhow!("Format error: This is not a PDF")),
     }
 }
 

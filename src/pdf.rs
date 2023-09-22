@@ -1,10 +1,10 @@
 use crate::text::Line;
+use anyhow::Result;
 use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
 use pdf2latex::utils::{
     args::Args,
     font::FontBase,
     glyph::Glyph,
-    result::Result,
     utils::{find_parts, log, pdf_to_images, Rect},
 };
 use std::{io::Write, path::Path, time};
