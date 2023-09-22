@@ -178,7 +178,7 @@ impl KnownGlyph {
     fn render(data: &GlyphData, id: usize) -> Result<(DynamicImage, i32)> {
         // Compute the LaTeX and write it to a file
         let code = data.1;
-        let latex = Self::latex(&data, &None, &None, true);
+        let latex = Self::latex(data, &None, &None, true);
         let doc = format!(
             "\\documentclass[11pt, border=4pt]{{standalone}}
             \\usepackage{{amsmath, amssymb, amsthm}}
