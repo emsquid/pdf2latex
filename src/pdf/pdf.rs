@@ -1,5 +1,5 @@
 use super::Page;
-use crate::args::Args;
+use crate::args::MainArg;
 use crate::fonts::FontBase;
 use crate::utils::{log, pdf_to_images};
 use anyhow::Result;
@@ -11,9 +11,9 @@ pub struct Pdf {
 }
 
 impl Pdf {
-    /// # Errors
-    ///
     /// Load a Pdf from the given path
+    ///
+    /// # Errors
     /// Fails if cannot convert the PDF into an image
     pub fn load(path: &Path) -> Result<Pdf> {
         let pages = pdf_to_images(path)?.iter().map(Page::from).collect();
@@ -21,23 +21,23 @@ impl Pdf {
         Ok(Pdf { pages })
     }
 
-    /// # Errors
-    ///
     /// Guess the content of a Pdf
+    ///
+    /// # Errors
     /// Fails if cannot write into stdout or log
-    pub fn guess(&mut self, args: &Args) -> Result<()> {
+    pub fn guess(&mut self, args: &MainArg) -> Result<()> {
         // The FontBase is needed to compare glyphs
         let fontbase = FontBase::try_from(args)?;
 
         for (i, page) in self.pages.iter_mut().enumerate() {
-            if args.verbose() {
+            if args.verbose {
                 log(&format!("\nPAGE {i}\n"), None, None, "1m")?;
             }
 
             page.guess(&fontbase, args)?;
         }
 
-        if args.verbose() {
+        if args.verbose {
             std::io::stdout().write_all(b"\n")?;
         }
 

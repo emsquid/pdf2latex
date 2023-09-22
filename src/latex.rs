@@ -28,9 +28,9 @@ impl LaTeX {
         LaTeX { content }
     }
 
-    /// # Errors
-    ///
     /// Save a LaTeX document at a given path
+    ///
+    /// # Errors
     /// Fails if cannot write into the file
     pub fn save(&self, path: &PathBuf) -> Result<()> {
         std::fs::write(path, &self.content)?;

@@ -66,10 +66,10 @@ fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
     Ok(images)
 }
 
-/// # Errors
-///
-/// Fails if the command pdftoppm is not executed correcly
 /// Convert a pdf to images
+///
+/// # Errors
+/// Fails if the command pdftoppm is not executed correcly
 pub fn pdf_to_images(path: &Path) -> Result<Vec<DynamicImage>> {
     let output = Command::new("pdftoppm")
         .args(["-r", "512", &path.to_string_lossy()])
@@ -178,10 +178,9 @@ pub fn round(value: f32, digits: u32) -> f32 {
     (value * (10.0_f32).powi(digits as i32)).round() / 10.0_f32.powi(digits as i32)
 }
 
-/// # Errors
-///
 /// Print a logging message to stdout
 ///
+/// # Errors
 /// Fails if it was impossible de to print in stdout
 pub fn log(
     message: &str,

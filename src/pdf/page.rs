@@ -1,4 +1,4 @@
-use crate::args::Args;
+use crate::args::MainArg;
 use crate::fonts::glyph::Glyph;
 use crate::fonts::FontBase;
 use crate::pdf::Line;
@@ -36,19 +36,19 @@ impl Page {
             .collect()
     }
 
-    /// # Errors 
+    /// Guess the content of a Page
+    ///
+    /// # Errors
     /// Fails if cannot log or cannot write into stdout
     /// # Panics
     /// Fails if cannot join correctly the threads
-    ///
-    /// Guess the content of a Page
-    pub fn guess(&mut self, fontbase: &FontBase, args: &Args) -> Result<()> {
+    pub fn guess(&mut self, fontbase: &FontBase, args: &MainArg) -> Result<()> {
         // We use a thread scope to ensure that variables live long enough
         std::thread::scope(|scope| -> Result<()> {
             let now = time::Instant::now();
             let mut progress = 0.;
             let step = 1. / self.lines.len() as f32;
-            if args.verbose() {
+            if args.verbose {
                 log("converting text", Some(0.), None, "s")?;
             }
 
@@ -60,12 +60,12 @@ impl Page {
                 handles.push(handle);
 
                 // Control the number of threads created
-                if handles.len() >= args.threads() {
+                if handles.len() >= args.threads {
                     handles.remove(0).join().unwrap();
                 }
 
                 progress += step;
-                if args.verbose() {
+                if args.verbose {
                     log("converting text", Some(progress), None, "u")?;
                 }
             }
@@ -76,7 +76,7 @@ impl Page {
             }
 
             let duration = now.elapsed().as_secs_f32();
-            if args.verbose() {
+            if args.verbose {
                 log("converting text", Some(1.), Some(duration), "u")?;
                 std::io::stdout().write_all(b"\n")?;
             }

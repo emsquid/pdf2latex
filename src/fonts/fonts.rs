@@ -1,5 +1,5 @@
 use super::{code::Code, glyph::KnownGlyph, size::Size, style::Style};
-use crate::args::Args;
+use crate::args::{FontArg, MainArg};
 use crate::utils::log;
 use anyhow::Result;
 use std::{collections::HashMap, io::Write, time, vec};
@@ -38,44 +38,28 @@ impl FontBase {
         }
     }
 
-    /// # Errors 
     /// Create a `FontBase` based on the given arguments
-    pub fn try_from(args: &Args) -> Result<FontBase> {
-        match args {
-            Args::Font(_) => {
-                // Create the font family
-                match args.create() {
-                    Some(codes) => {
-                        for &code in codes {
-                            Self::create_family(code, args)?;
-                        }
-                    }
-                    None => {
-                        println!("Please, provide fonts to generate");
-                    }
-                };
-                Ok(FontBase::new())
-            }
-            Args::Main(_) => {
-                let now = time::Instant::now();
-                if args.verbose() {
-                    log("LOADING FONTS\n", None, None, "1m")?;
-                }
-
-                // Load each family into the FontBase
-                let mut fontbase = FontBase::new();
-                for code in Code::all() {
-                    fontbase.glyphs.insert(code, Self::load_family(code, args)?);
-                }
-
-                let duration = now.elapsed().as_secs_f32();
-                if args.verbose() {
-                    log("LOADED FONTS", None, Some(duration), "1m")?;
-                    std::io::stdout().write_all(b"\n")?;
-                }
-                Ok(fontbase)
-            }
+    ///
+    /// # Errors
+    /// Fails if it is unable to read the saved fonts
+    pub fn try_from(args: &MainArg) -> Result<FontBase> {
+        let now = time::Instant::now();
+        if args.verbose {
+            log("LOADING FONTS\n", None, None, "1m")?;
         }
+
+        // Load each family into the FontBase
+        let mut fontbase = FontBase::new();
+        for code in Code::all() {
+            fontbase.glyphs.insert(code, Self::load_family(code, args)?);
+        }
+
+        let duration = now.elapsed().as_secs_f32();
+        if args.verbose {
+            log("LOADED FONTS", None, Some(duration), "1m")?;
+            std::io::stdout().write_all(b"\n")?;
+        }
+        Ok(fontbase)
     }
 
     /// Get the glyphs stored for the given family and size
@@ -89,9 +73,34 @@ impl FontBase {
         }
     }
 
+    /// Load the glyphs for a family sorted by dimensions
+    fn load_family(code: Code, args: &MainArg) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
+        if args.verbose {
+            log(&format!("loading font {code}"), Some(0.), None, "s")?;
+        }
+
+        // Load each glyph into the family based on its dimensions
+        let mut family = HashMap::new();
+        for size in Size::all() {
+            for glyph in Self::get_family(code, size)? {
+                family
+                    .entry((glyph.rect.width, glyph.rect.height))
+                    .or_insert(Vec::new())
+                    .push(glyph);
+            }
+        }
+
+        if args.verbose {
+            log(&format!("loading font {code}"), Some(1.), None, "u")?;
+            std::io::stdout().write_all(b"\n")?;
+        }
+
+        Ok(family)
+    }
+
     /// Create and store the glyphs for the given family
-    fn create_family(code: Code, args: &Args) -> Result<()> {
-        if args.verbose() {
+    pub fn create_family(code: Code, args: &FontArg) -> Result<()> {
+        if args.verbose {
             log(&format!("CREATING FONT {code}\n"), None, None, "1m")?;
         }
 
@@ -105,7 +114,7 @@ impl FontBase {
 
             // We create a different file for each size
             for size in Size::all() {
-                if args.verbose() {
+                if args.verbose {
                     log(&size.to_string(), Some(0.), None, "s")?;
                 }
 
@@ -136,7 +145,7 @@ impl FontBase {
                         handles.push(scope.spawn(move || KnownGlyph::try_from(data, id)));
 
                         // Control the number of threads created
-                        if handles.len() >= args.threads() {
+                        if handles.len() >= args.threads {
                             let glyph = handles.remove(0).join().unwrap()?;
                             glyphs.push(glyph);
 
@@ -145,7 +154,7 @@ impl FontBase {
                             std::fs::write(format!("{}/{}", code.as_path(), size.as_path()), bit)?;
                         }
 
-                        if args.verbose() {
+                        if args.verbose {
                             let progress = id as f32 / count as f32;
                             log(&size.to_string(), Some(progress), None, "u")?;
                         }
@@ -164,7 +173,7 @@ impl FontBase {
                 let bit = bitcode::encode(&glyphs)?;
                 std::fs::write(format!("{}/{}", code.as_path(), size.as_path()), bit)?;
 
-                if args.verbose() {
+                if args.verbose {
                     log(&size.to_string(), Some(1.), None, "u")?;
                     std::io::stdout().write_all(b"\n")?;
                 }
@@ -175,37 +184,12 @@ impl FontBase {
             Ok(())
         })?;
 
-        if args.verbose() {
+        if args.verbose {
             log(&format!("CREATED FONT {code}\n"), None, None, "1m")?;
             std::io::stdout().write_all(b"\n")?;
         }
 
         Ok(())
-    }
-
-    /// Load the glyphs for a family sorted by dimensions
-    fn load_family(code: Code, args: &Args) -> Result<HashMap<(u32, u32), Vec<KnownGlyph>>> {
-        if args.verbose() {
-            log(&format!("loading font {code}"), Some(0.), None, "s")?;
-        }
-
-        // Load each glyph into the family based on its dimensions
-        let mut family = HashMap::new();
-        for size in Size::all() {
-            for glyph in Self::get_family(code, size)? {
-                family
-                    .entry((glyph.rect.width, glyph.rect.height))
-                    .or_insert(Vec::new())
-                    .push(glyph);
-            }
-        }
-
-        if args.verbose() {
-            log(&format!("loading font {code}"), Some(1.), None, "u")?;
-            std::io::stdout().write_all(b"\n")?;
-        }
-
-        Ok(family)
     }
 
     /// Generate the data needed to create alphanumeric glyphs

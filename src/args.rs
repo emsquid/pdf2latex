@@ -2,37 +2,6 @@ use crate::fonts::code::Code;
 use clap::{arg, command, Parser};
 use std::path::PathBuf;
 
-pub enum Args<'a> {
-    Main(&'a MainArg),
-    Font(&'a FontArg),
-}
-
-impl<'a> Args<'a> {
-    #[must_use]
-    pub fn verbose(&self) -> bool {
-        match self {
-            Args::Main(args) => args.verbose,
-            Args::Font(args) => args.verbose,
-        }
-    }
-
-    #[must_use]
-    pub fn create(&self) -> Option<&Vec<Code>> {
-        match self {
-            Args::Main(_) => None,
-            Args::Font(args) => Some(&args.create),
-        }
-    }
-
-    #[must_use]
-    pub fn threads(&self) -> usize {
-        match self {
-            Args::Main(args) => args.threads,
-            Args::Font(args) => args.threads,
-        }
-    }
-}
-
 /// Arguments the user can give when using pdf2latex to parse a pdf to a latex file
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -58,7 +27,7 @@ pub struct MainArg {
 #[command(author, version, about)]
 pub struct FontArg {
     /// Font files to create
-    pub create: Vec<Code>,
+    pub codes: Vec<Code>,
 
     /// Number of threads to use
     #[arg(short, long, default_value_t = 8)]

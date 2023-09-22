@@ -125,10 +125,10 @@ impl Glyph for KnownGlyph {
 }
 
 impl KnownGlyph {
-    /// # Errors
-    ///
-    /// Fails if it impossible to rendre the current Glyph
     /// Create a `KnownGlyph` from the given data, code and id
+    ///
+    /// # Errors
+    /// Fails if it impossible to rendre the current Glyph
     pub fn try_from(data: GlyphData, id: usize) -> Result<KnownGlyph> {
         let (image, offset) = Self::render(&data, id)?;
 
@@ -336,10 +336,10 @@ impl Glyph for UnknownGlyph {
 }
 
 impl UnknownGlyph {
-    /// # Panics
-    ///
-    /// Panics if the image is not formatted correcly
     /// Create an `UnknownGlyph` from the given start, bounds and image
+    ///
+    /// # Panics
+    /// Panics if the image is not formatted correcly
     #[must_use]
     pub fn from(start: (u32, u32), bounds: Rect, image: &DynamicImage) -> UnknownGlyph {
         // We get all the pixels with flood fill
