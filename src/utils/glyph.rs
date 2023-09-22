@@ -1,4 +1,4 @@
-use crate::{
+use super::{
     code::Code,
     font::FontBase,
     result::Result,
@@ -181,7 +181,7 @@ impl KnownGlyph {
             \\usepackage{{amsmath, amssymb, amsthm}}
             \\usepackage{{euscript, mathrsfs}}
             \\begin{{document}}
-            . \\fontfamily{{{code}}}\\selectfont {latex}}}
+            . \\fontfamily{{{code}}}\\selectfont {latex}
             \\end{{document}}"
         );
         std::fs::write(format!("temp/{id}.tex"), doc)?;

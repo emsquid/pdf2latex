@@ -1,4 +1,4 @@
-use crate::result::{Error, Result};
+use super::result::{Error, Result};
 use image::{DynamicImage, GrayImage};
 use std::cmp::Ordering;
 use std::io::Write;

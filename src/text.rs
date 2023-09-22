@@ -1,5 +1,5 @@
 use image::DynamicImage;
-use utils::{
+use pdf2latex::utils::{
     font::FontBase,
     glyph::{
         Glyph, KnownGlyph, UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD,

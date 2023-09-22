@@ -1,17 +1,15 @@
 use clap::Parser;
-use utils::{
-    args::{self, Args},
-    result,
+use pdf2latex::utils::{
+    args::{Args, MainArgs},
+    result::Result,
 };
-
-// mod args;
 mod latex;
 mod pdf;
 mod text;
 
 /// Process the arguments given by the user
-fn process(args: &args::MainArgs) -> result::Result<()> {
-    let main_args = Args::MainArgs(args);
+fn process(args: MainArgs) -> Result<()> {
+    let main_args = Args::Main(&args);
     // Load the pdf
     let mut pdf = pdf::Pdf::load(&args.input)?;
 
@@ -30,7 +28,7 @@ fn process(args: &args::MainArgs) -> result::Result<()> {
 }
 
 fn main() {
-    if let Err(err) = process(&args::MainArgs::parse()) {
+    if let Err(err) = process(MainArgs::parse()) {
         eprintln!("{err}");
     }
 }

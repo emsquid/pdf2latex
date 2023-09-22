@@ -1,32 +1,31 @@
+use super::code::Code;
 use clap::{arg, command, Parser};
 use std::path::PathBuf;
 
-use crate::code::Code;
-
 pub enum Args<'a> {
-    MainArgs(&'a MainArgs),
-    FontBaseArgs(&'a FontBaseArgs),
+    Main(&'a MainArgs),
+    Font(&'a FontArgs),
 }
 
 impl<'a> Args<'a> {
     pub fn verbose(&self) -> bool {
         match self {
-            Args::MainArgs(args) => args.verbose,
-            Args::FontBaseArgs(args) => args.verbose,
+            Args::Main(args) => args.verbose,
+            Args::Font(args) => args.verbose,
         }
     }
 
     pub fn create(&self) -> Option<&Vec<Code>> {
         match self {
-            Args::MainArgs(_) => None,
-            Args::FontBaseArgs(args) => args.create.as_ref(),
+            Args::Main(_) => None,
+            Args::Font(args) => Some(&args.create),
         }
     }
 
     pub fn threads(&self) -> usize {
         match self {
-            Args::MainArgs(args) => args.threads,
-            Args::FontBaseArgs(args) => args.threads,
+            Args::Main(args) => args.threads,
+            Args::Font(args) => args.threads,
         }
     }
 }
@@ -54,14 +53,13 @@ pub struct MainArgs {
 /// Arguments the user can give when using pdf2latex to generate FontBases
 #[derive(Parser)]
 #[command(author, version, about)]
-pub struct FontBaseArgs {
+pub struct FontArgs {
+    /// Font files to create
+    pub create: Vec<Code>,
+
     /// Number of threads to use
     #[arg(short, long, default_value_t = 8)]
     pub threads: usize,
-
-    /// Create font files
-    #[arg(short, long, value_enum, num_args(1..))]
-    pub create: Option<Vec<Code>>,
 
     /// Verbose mode
     #[arg(short, long, default_value_t = false)]

@@ -1,11 +1,13 @@
-use crate::{args::Args, result::Result, text::Line};
+use crate::text::Line;
 use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
-use std::{io::Write, path::Path, time};
-use utils::{
+use pdf2latex::utils::{
+    args::Args,
     font::FontBase,
     glyph::Glyph,
+    result::Result,
     utils::{find_parts, log, pdf_to_images, Rect},
 };
+use std::{io::Write, path::Path, time};
 
 const LINE_SPACING: u32 = 10;
 

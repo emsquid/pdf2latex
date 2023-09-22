@@ -1,4 +1,4 @@
-use crate::{
+use super::{
     args::Args, code::Code, glyph::KnownGlyph, result::Result, size::Size, style::Style, utils::log,
 };
 use std::{collections::HashMap, io::Write, time, vec};
@@ -33,7 +33,7 @@ impl FontBase {
     /// Create a FontBase based on the given arguments
     pub fn try_from(args: &Args) -> Result<FontBase> {
         match args {
-            Args::FontBaseArgs(_) => {
+            Args::Font(_) => {
                 // Create the font family
                 match args.create() {
                     Some(codes) => {
@@ -47,7 +47,7 @@ impl FontBase {
                 };
                 Ok(FontBase::new())
             }
-            Args::MainArgs(_) => {
+            Args::Main(_) => {
                 let now = time::Instant::now();
                 if args.verbose() {
                     log("LOADING FONTS\n", None, None, "1m")?;
