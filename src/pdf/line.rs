@@ -16,6 +16,7 @@ pub struct Line {
 
 impl Line {
     /// Create a Line from the given rect and image
+    #[must_use]
     pub fn from(rect: Rect, image: &DynamicImage) -> Line {
         let words = Self::find_words(rect, image);
         let baseline = Self::find_baseline(&words);
@@ -60,6 +61,7 @@ impl Line {
     }
 
     /// Get the guess for the first glyph in a Line
+    #[must_use]
     pub fn get_first_guess(&self) -> Option<KnownGlyph> {
         self.words
             .first()
@@ -67,6 +69,7 @@ impl Line {
     }
 
     /// Get the guess for the last glyph in a Line
+    #[must_use]
     pub fn get_last_guess(&self) -> Option<KnownGlyph> {
         self.words
             .last()
@@ -83,6 +86,7 @@ impl Line {
     }
 
     /// Get the LaTeX for a Line
+    #[must_use]
     pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
         self.words
             .iter()
@@ -105,31 +109,33 @@ impl Line {
 
     /// Compute the sum of the distance of each Word in the Line
     pub fn get_dist_sum(&self) -> f32 {
-        self.words.iter().map(|word| word.get_dist_sum()).sum()
+        self.words.iter().map(Word::get_dist_sum).sum()
     }
 
     /// Compute the number of glyph in a Line
+    #[must_use]
     pub fn get_glyph_count(&self) -> u32 {
         self.words.iter().map(|word| word.glyphs.len() as u32).sum()
     }
 
+    #[must_use]
     pub fn get_margins(&self) -> (Option<u32>, Option<u32>) {
         (self.get_left_margin(), self.get_right_margin())
     }
 
     /// Compute the relative margin of the last glyph of the line
+    #[must_use]
     pub fn get_right_margin(&self) -> Option<u32> {
         self.words
             .last()
-            .and_then(|word| word.glyphs.last())
-            .and_then(|glyph| Some(glyph.rect.width + glyph.rect.x))
+            .and_then(|word| word.glyphs.last()).map(|glyph| glyph.rect.width + glyph.rect.x)
     }
 
     /// Compute the relative margin of the first glyph of the line
+    #[must_use]
     pub fn get_left_margin(&self) -> Option<u32> {
         self.words
             .first()
-            .and_then(|word| word.glyphs.first())
-            .and_then(|glyph| Some(glyph.rect.x))
+            .and_then(|word| word.glyphs.first()).map(|glyph| glyph.rect.x)
     }
 }

@@ -10,6 +10,7 @@ pub struct LaTeX {
 
 impl LaTeX {
     /// Create a LaTeX document from a PDF
+    #[must_use]
     pub fn from(pdf: &Pdf) -> LaTeX {
         let margin = pdf.get_margin();
 
@@ -27,7 +28,10 @@ impl LaTeX {
         LaTeX { content }
     }
 
+    /// # Errors
+    ///
     /// Save a LaTeX document at a given path
+    /// Fails if cannot write into the file
     pub fn save(&self, path: &PathBuf) -> Result<()> {
         std::fs::write(path, &self.content)?;
 

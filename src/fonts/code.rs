@@ -29,6 +29,7 @@ impl std::fmt::Display for Code {
 }
 
 impl Code {
+    #[must_use]
     pub fn all() -> Vec<Code> {
         vec![
             Code::Cmr,
@@ -41,6 +42,7 @@ impl Code {
         ]
     }
 
+    #[must_use]
     pub fn as_path(self) -> String {
         let config = dirs::config_dir().unwrap_or(PathBuf::from("~/.config"));
         format!("{}/pdf2latex/{self}", config.display())

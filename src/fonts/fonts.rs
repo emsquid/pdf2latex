@@ -23,15 +23,23 @@ pub struct FontBase {
     pub glyphs: HashMap<Code, HashMap<(u32, u32), Vec<KnownGlyph>>>,
 }
 
+impl Default for FontBase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FontBase {
-    /// Create an empty FontBase
+    /// Create an empty `FontBase`
+    #[must_use]
     pub fn new() -> FontBase {
         FontBase {
             glyphs: HashMap::new(),
         }
     }
 
-    /// Create a FontBase based on the given arguments
+    /// # Errors 
+    /// Create a `FontBase` based on the given arguments
     pub fn try_from(args: &Args) -> Result<FontBase> {
         match args {
             Args::Font(_) => {

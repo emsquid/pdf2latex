@@ -113,16 +113,19 @@ impl Word {
     }
 
     /// Get the guess for the first glyph in a Word
+    #[must_use]
     pub fn get_first_guess(&self) -> Option<KnownGlyph> {
         self.glyphs.first().and_then(|glyph| glyph.guess.clone())
     }
 
     /// Get the guess for the last glyph in a Word
+    #[must_use]
     pub fn get_last_guess(&self) -> Option<KnownGlyph> {
         self.glyphs.last().and_then(|glyph| glyph.guess.clone())
     }
 
     /// Get the content of a Word, mostly for debugging
+    #[must_use]
     pub fn get_content(&self) -> String {
         self.glyphs
             .iter()
@@ -134,6 +137,7 @@ impl Word {
     }
 
     /// Get the LaTeX for a Word
+    #[must_use]
     pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
         self.glyphs
             .iter()
@@ -150,6 +154,7 @@ impl Word {
     }
 
     /// Compute the sum of the distance of each Glyph in the Word
+    #[must_use]
     pub fn get_dist_sum(&self) -> f32 {
         self.glyphs
             .iter()
@@ -157,3 +162,4 @@ impl Word {
             .sum()
     }
 }
+

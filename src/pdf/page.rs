@@ -1,7 +1,7 @@
-use super::Line;
 use crate::args::Args;
+use crate::fonts::glyph::Glyph;
 use crate::fonts::FontBase;
-use crate::fonts::Glyph;
+use crate::pdf::Line;
 use crate::utils::{find_parts, log, most_frequent, Rect};
 use anyhow::Result;
 use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
@@ -17,6 +17,7 @@ pub struct Page {
 
 impl Page {
     /// Create a Page from an image
+    #[must_use]
     pub fn from(image: &DynamicImage) -> Page {
         Page {
             image: image.clone(),
@@ -35,6 +36,11 @@ impl Page {
             .collect()
     }
 
+    /// # Errors 
+    /// Fails if cannot log or cannot write into stdout
+    /// # Panics
+    /// Fails if cannot join correctly the threads
+    ///
     /// Guess the content of a Page
     pub fn guess(&mut self, fontbase: &FontBase, args: &Args) -> Result<()> {
         // We use a thread scope to ensure that variables live long enough
@@ -93,7 +99,7 @@ impl Page {
         let right_margins = self
             .lines
             .iter()
-            .flat_map(|line| line.get_right_margin())
+            .filter_map(Line::get_right_margin)
             .collect::<Vec<u32>>();
         let right_margin_mode = most_frequent(&right_margins, 0).0;
 

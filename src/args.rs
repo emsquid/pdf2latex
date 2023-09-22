@@ -3,11 +3,12 @@ use clap::{arg, command, Parser};
 use std::path::PathBuf;
 
 pub enum Args<'a> {
-    Main(&'a MainArgs),
-    Font(&'a FontArgs),
+    Main(&'a MainArg),
+    Font(&'a FontArg),
 }
 
 impl<'a> Args<'a> {
+    #[must_use]
     pub fn verbose(&self) -> bool {
         match self {
             Args::Main(args) => args.verbose,
@@ -15,6 +16,7 @@ impl<'a> Args<'a> {
         }
     }
 
+    #[must_use]
     pub fn create(&self) -> Option<&Vec<Code>> {
         match self {
             Args::Main(_) => None,
@@ -22,6 +24,7 @@ impl<'a> Args<'a> {
         }
     }
 
+    #[must_use]
     pub fn threads(&self) -> usize {
         match self {
             Args::Main(args) => args.threads,
@@ -33,7 +36,7 @@ impl<'a> Args<'a> {
 /// Arguments the user can give when using pdf2latex to parse a pdf to a latex file
 #[derive(Parser)]
 #[command(author, version, about)]
-pub struct MainArgs {
+pub struct MainArg {
     /// PDF to convert
     pub input: PathBuf,
 
@@ -50,10 +53,10 @@ pub struct MainArgs {
     pub verbose: bool,
 }
 
-/// Arguments the user can give when using pdf2latex to generate FontBases
+/// Arguments the user can give when using pdf2latex to generate `FontBases`
 #[derive(Parser)]
 #[command(author, version, about)]
-pub struct FontArgs {
+pub struct FontArg {
     /// Font files to create
     pub create: Vec<Code>,
 

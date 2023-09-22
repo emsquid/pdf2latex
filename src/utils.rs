@@ -17,6 +17,7 @@ pub struct Rect {
 
 impl Rect {
     /// Create a new Rect with the given coordinates and dimensions
+    #[must_use]
     pub fn new(x: u32, y: u32, width: u32, height: u32) -> Rect {
         Rect {
             x,
@@ -27,14 +28,15 @@ impl Rect {
     }
 
     /// Crop an image with the Rect
+    #[must_use]
     pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
         image.crop_imm(self.x, self.y, self.width, self.height)
     }
 }
 
 /// Split a slice based on a delimiter
-fn split<T: PartialEq>(buffer: &[T], delimiter: T) -> Vec<&[T]> {
-    buffer.split(|b| b == &delimiter).collect()
+fn split<'a, T: PartialEq>(buffer: &'a [T], delimiter: &'a T) -> Vec<&'a [T]> {
+    buffer.split(|b| b == delimiter).collect()
 }
 
 /// Convert a slice of u8 to an usize
@@ -51,8 +53,8 @@ fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
     let mut start = 0;
 
     while start < buffer.len() {
-        let infos = split(&buffer[start..start + 40], b'\n');
-        let (code, size, rgb) = (infos[0], split(infos[1], b' '), infos[2]);
+        let infos = split(&buffer[start..start + 40], &b'\n');
+        let (code, size, rgb) = (infos[0], split(infos[1], &b' '), infos[2]);
         let (width, height) = (buffer_to_usize(size[0])?, buffer_to_usize(size[1])?);
         let size = code.len() + size.len() + rgb.len() + 10 + width * height * 3;
 
@@ -64,6 +66,9 @@ fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
     Ok(images)
 }
 
+/// # Errors
+///
+/// Fails if the command pdftoppm is not executed correcly
 /// Convert a pdf to images
 pub fn pdf_to_images(path: &Path) -> Result<Vec<DynamicImage>> {
     let output = Command::new("pdftoppm")
@@ -76,6 +81,7 @@ pub fn pdf_to_images(path: &Path) -> Result<Vec<DynamicImage>> {
 }
 
 /// Find the different black parts in an image with the given spacing
+#[must_use]
 pub fn find_parts(gray: &GrayImage, spacing: u32) -> Vec<(u32, u32)> {
     let mut parts = Vec::new();
 
@@ -117,6 +123,7 @@ pub fn find_parts(gray: &GrayImage, spacing: u32) -> Vec<(u32, u32)> {
 }
 
 /// Compute a flood fill from start with the given threshold
+#[must_use]
 pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Vec<(u32, u32)> {
     let mut pixels = start;
     let mut index = 0;
@@ -166,11 +173,16 @@ pub fn most_frequent<T: Hash + Eq + Copy>(array: &[T], default: T) -> (T, i32) {
 }
 
 /// Round a value to a certain number of digits
-pub fn round(value: f32, digits: u32) -> f32 {
+#[must_use]
+pub fn round(value: f32, digits: u32) -> f32 {      
     (value * (10.0_f32).powi(digits as i32)).round() / 10.0_f32.powi(digits as i32)
 }
 
+/// # Errors
+///
 /// Print a logging message to stdout
+///
+/// Fails if it was impossible de to print in stdout
 pub fn log(
     message: &str,
     progress: Option<f32>,

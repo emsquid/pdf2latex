@@ -34,11 +34,13 @@ impl std::fmt::Display for Style {
 
 impl Style {
     /// Create an iterator over normal style only
+    #[must_use]
     pub fn basic() -> Vec<Vec<Style>> {
         vec![vec![Style::Normal]]
     }
 
     /// Create an iterator over text styles
+    #[must_use]
     pub fn text() -> Vec<Vec<Style>> {
         vec![
             vec![Style::Normal],
@@ -52,6 +54,7 @@ impl Style {
     }
 
     /// Create an iterator over math styles
+    #[must_use]
     pub fn math() -> Vec<Vec<Style>> {
         vec![
             vec![Style::BlackBoard],

@@ -11,14 +11,20 @@ pub struct Pdf {
 }
 
 impl Pdf {
+    /// # Errors
+    ///
     /// Load a Pdf from the given path
+    /// Fails if cannot convert the PDF into an image
     pub fn load(path: &Path) -> Result<Pdf> {
         let pages = pdf_to_images(path)?.iter().map(Page::from).collect();
 
         Ok(Pdf { pages })
     }
 
+    /// # Errors
+    ///
     /// Guess the content of a Pdf
+    /// Fails if cannot write into stdout or log
     pub fn guess(&mut self, args: &Args) -> Result<()> {
         // The FontBase is needed to compare glyphs
         let fontbase = FontBase::try_from(args)?;
@@ -39,6 +45,7 @@ impl Pdf {
     }
 
     /// Compute the overall margin of a Pdf
+    #[must_use]
     pub fn get_margin(&self) -> f32 {
         self.pages
             .iter()
@@ -63,7 +70,7 @@ impl Pdf {
             .join("\n")
     }
 
-    /// Get the LateX of a Pdf
+    /// Get the `LateX` of a Pdf
     pub fn get_latex(&self) -> String {
         self.pages.iter().map(Page::get_latex).collect()
     }

@@ -1,4 +1,5 @@
-use super::{Code, FontBase, Size, Style};
+use super::{code::Code, size::Size, style::Style};
+use crate::fonts::FontBase;
 use crate::utils::{find_parts, flood_fill, Rect};
 use anyhow::Result;
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
@@ -79,6 +80,8 @@ pub trait Glyph {
         *dist.values().min_by(|a, b| a.total_cmp(b)).unwrap()
     }
 
+    /// # Errors
+    ///
     /// Save the glyph image at the given path
     fn save(&self, path: &str) -> Result<()> {
         image::save_buffer_with_format(
@@ -122,9 +125,12 @@ impl Glyph for KnownGlyph {
 }
 
 impl KnownGlyph {
-    /// Create a KnownGlyph from the given data, code and id
+    /// # Errors
+    ///
+    /// Fails if it impossible to rendre the current Glyph
+    /// Create a `KnownGlyph` from the given data, code and id
     pub fn try_from(data: GlyphData, id: usize) -> Result<KnownGlyph> {
-        let (image, offset) = Self::render(data.clone(), id)?;
+        let (image, offset) = Self::render(&data, id)?;
 
         Ok(KnownGlyph {
             base: data.0,
@@ -139,7 +145,8 @@ impl KnownGlyph {
         })
     }
 
-    /// Get the essential data for a KnownGlyph
+    /// Get the essential data for a `KnownGlyph`
+    #[must_use]
     pub fn get_data(&self) -> GlyphData {
         (
             self.base.clone(),
@@ -151,7 +158,8 @@ impl KnownGlyph {
         )
     }
 
-    /// Get the LaTeX for a KnownGlyph
+    /// Get the LaTeX for a `KnownGlyph`
+    #[must_use]
     pub fn get_latex(
         &self,
         prev: &Option<KnownGlyph>,
@@ -159,7 +167,7 @@ impl KnownGlyph {
         end: bool,
     ) -> String {
         Self::latex(
-            self.get_data(),
+            &self.get_data(),
             &prev.clone().map(|glyph| glyph.get_data()),
             &next.clone().map(|glyph| glyph.get_data()),
             end,
@@ -167,10 +175,10 @@ impl KnownGlyph {
     }
 
     /// Create the image for some glyph data and compute its offset
-    fn render(data: GlyphData, id: usize) -> Result<(DynamicImage, i32)> {
+    fn render(data: &GlyphData, id: usize) -> Result<(DynamicImage, i32)> {
         // Compute the LaTeX and write it to a file
         let code = data.1;
-        let latex = Self::latex(data, &None, &None, true);
+        let latex = Self::latex(&data, &None, &None, true);
         let doc = format!(
             "\\documentclass[11pt, border=4pt]{{standalone}}
             \\usepackage{{amsmath, amssymb, amsthm}}
@@ -203,7 +211,7 @@ impl KnownGlyph {
 
     /// Create the LaTeX for some glyph data
     fn latex(
-        data: GlyphData,
+        data: &GlyphData,
         prev: &Option<GlyphData>,
         next: &Option<GlyphData>,
         end: bool,
@@ -328,7 +336,11 @@ impl Glyph for UnknownGlyph {
 }
 
 impl UnknownGlyph {
-    /// Create an UnknownGlyph from the given start, bounds and image
+    /// # Panics
+    ///
+    /// Panics if the image is not formatted correcly
+    /// Create an `UnknownGlyph` from the given start, bounds and image
+    #[must_use]
     pub fn from(start: (u32, u32), bounds: Rect, image: &DynamicImage) -> UnknownGlyph {
         // We get all the pixels with flood fill
         let pixels = flood_fill(vec![start], &bounds.crop(image).to_luma8(), CHAR_THRESHOLD);
@@ -354,7 +366,8 @@ impl UnknownGlyph {
         }
     }
 
-    /// Create an UnknownGlyph by joining one with another
+    /// Create an `UnknownGlyph` by joining one with another
+    #[must_use]
     pub fn join(&self, other: &UnknownGlyph) -> UnknownGlyph {
         // Compute the new boundaries
         let x = self.rect.x.min(other.rect.x);
@@ -394,7 +407,7 @@ impl UnknownGlyph {
         }
     }
 
-    /// Try to find the closest KnownGlyph to this UnknownGlyph in a FontBase
+    /// Try to find the closest `KnownGlyph` to this `UnknownGlyph` in a `FontBase`
     pub fn try_guess(&mut self, fontbase: &FontBase, baseline: u32, aligned: bool) {
         let mut closest = self.dist.unwrap_or(f32::INFINITY);
         let mut current_guess: Option<&KnownGlyph> = None;

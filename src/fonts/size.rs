@@ -33,6 +33,7 @@ impl std::fmt::Display for Size {
 
 impl Size {
     /// Create an iterator over all possible sizes
+    #[must_use]
     pub fn all() -> Vec<Size> {
         vec![
             Size::Normalsize,
@@ -49,6 +50,7 @@ impl Size {
     }
 
     /// Convert a size to a decent file path
+    #[must_use]
     pub fn as_path(self) -> String {
         match self {
             Size::Tiny => "tiny",

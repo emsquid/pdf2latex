@@ -1,12 +1,12 @@
 use anyhow::Result;
 use clap::Parser;
 use pdf2latex::args::Args;
-use pdf2latex::args::MainArgs;
+use pdf2latex::args::MainArg;
 use pdf2latex::latex::LaTeX;
 use pdf2latex::pdf::Pdf;
 
 /// Process the arguments given by the user
-fn process(args: &MainArgs) -> Result<()> {
+fn process(args: &MainArg) -> Result<()> {
     let main_args = Args::Main(args);
     // Load the pdf
     let mut pdf = Pdf::load(&args.input)?;
@@ -26,7 +26,7 @@ fn process(args: &MainArgs) -> Result<()> {
 }
 
 fn main() {
-    if let Err(err) = process(&MainArgs::parse()) {
+    if let Err(err) = process(&MainArg::parse()) {
         eprintln!("{err}");
     }
 }
