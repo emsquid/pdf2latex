@@ -1,10 +1,5 @@
-use super::{
-    code::Code,
-    font::FontBase,
-    size::Size,
-    style::Style,
-    utils::{find_parts, flood_fill, Rect},
-};
+use super::{Code, FontBase, Size, Style};
+use crate::utils::{find_parts, flood_fill, Rect};
 use anyhow::Result;
 use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
 use std::{collections::HashMap, process::Command};

@@ -1,9 +1,31 @@
-pub mod utils {
-    pub mod args;
+pub mod args;
+pub mod latex;
+pub mod utils;
+
+pub mod pdf {
+    pub mod line;
+    pub mod page;
+    pub mod pdf;
+    pub mod word;
+    // Reexport struct
+    pub use line::Line;
+    pub use page::Page;
+    pub use pdf::Pdf;
+    pub use word::Word;
+}
+
+pub mod fonts {
     pub mod code;
-    pub mod font;
+    pub mod fonts;
     pub mod glyph;
     pub mod size;
     pub mod style;
-    pub mod utils;
+    // Reexport struct
+    pub use code::Code;
+    pub use fonts::FontBase;
+    pub use glyph::{
+        Glyph, KnownGlyph, UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD,
+    };
+    pub use size::Size;
+    pub use style::Style;
 }

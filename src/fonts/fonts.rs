@@ -1,4 +1,6 @@
-use super::{args::Args, code::Code, glyph::KnownGlyph, size::Size, style::Style, utils::log};
+use super::{code::Code, glyph::KnownGlyph, size::Size, style::Style};
+use crate::args::Args;
+use crate::utils::log;
 use anyhow::Result;
 use std::{collections::HashMap, io::Write, time, vec};
 

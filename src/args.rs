@@ -1,4 +1,4 @@
-use super::code::Code;
+use crate::fonts::code::Code;
 use clap::{arg, command, Parser};
 use std::path::PathBuf;
 
