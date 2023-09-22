@@ -2,7 +2,6 @@ use anyhow::{anyhow, Result};
 use image::{DynamicImage, GrayImage};
 use std::cmp::Ordering;
 use std::io::Write;
-use std::ops::AddAssign;
 use std::path::Path;
 use std::process::Command;
 use std::{collections::HashMap, hash::Hash};
@@ -147,18 +146,23 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
     pixels
 }
 
-/// Find the value that appears most often in list
-pub fn mode<T: Eq + Hash>(list: Vec<T>, default: T) -> T {
-    let mut count = HashMap::new();
-    for key in list {
-        count.entry(key).or_insert(0).add_assign(1);
+/// return a tuple (count, value) where count represent the number of times that value is present
+/// in `array`
+pub fn most_frequent<T: Hash + Eq + Copy>(array: &[T], default: T) -> (T, i32) {
+    let mut hash_map = HashMap::new();
+    for value in array {
+        hash_map.entry(value).and_modify(|v| *v += 1).or_insert(0);
     }
 
-    count
-        .into_iter()
-        .max_by_key(|&(_, c)| c)
-        .unwrap_or((default, 0))
-        .0
+    let (mut mode, mut max): (T, i32) = (default, 0);
+    for (&value, count) in hash_map {
+        if count > max {
+            mode = value;
+            max = count;
+        }
+    }
+
+    (mode, max)
 }
 
 /// Round a value to a certain number of digits

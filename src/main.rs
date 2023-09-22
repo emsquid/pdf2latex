@@ -6,8 +6,8 @@ mod text;
 use anyhow::Result;
 
 /// Process the arguments given by the user
-fn process(args: MainArgs) -> Result<()> {
-    let main_args = Args::Main(&args);
+fn process(args: &MainArgs) -> Result<()> {
+    let main_args = Args::Main(args);
     // Load the pdf
     let mut pdf = pdf::Pdf::load(&args.input)?;
 
@@ -26,7 +26,7 @@ fn process(args: MainArgs) -> Result<()> {
 }
 
 fn main() {
-    if let Err(err) = process(MainArgs::parse()) {
+    if let Err(err) = process(&MainArgs::parse()) {
         eprintln!("{err}");
     }
 }

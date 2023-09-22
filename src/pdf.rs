@@ -5,7 +5,7 @@ use pdf2latex::utils::{
     args::Args,
     font::FontBase,
     glyph::Glyph,
-    utils::{find_parts, log, pdf_to_images, Rect},
+    utils::{find_parts, log, most_frequent, pdf_to_images, Rect},
 };
 use std::{io::Write, path::Path, time};
 
@@ -92,14 +92,28 @@ impl Page {
 
     /// Get the LaTeX for a Page
     pub fn get_latex(&self) -> String {
+        let right_margins = self
+            .lines
+            .iter()
+            .flat_map(|line| line.get_right_margin())
+            .collect::<Vec<u32>>();
+        let right_margin_mode = most_frequent(&right_margins, 0).0;
+
         self.lines
             .iter()
             .enumerate()
             .map(|(i, line)| {
                 let prev = self.lines.get(i - 1).and_then(Line::get_last_guess);
                 let next = self.lines.get(i + 1).and_then(Line::get_first_guess);
-
-                format!("\n    {}", line.get_latex(&prev, &next))
+                let newline = if line
+                    .get_right_margin()
+                    .is_some_and(|margin| margin < right_margin_mode - 10)
+                {
+                    "\n"
+                } else {
+                    ""
+                };
+                format!("\n    {}{}", line.get_latex(&prev, &next), newline)
             })
             .collect()
     }
