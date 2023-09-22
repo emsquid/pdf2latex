@@ -209,3 +209,23 @@ pub fn log(
 
     Ok(())
 }
+
+/// return a tuple (count, value) where count represent the number of times that value is present
+/// in `array`
+pub fn most_frequent<T>(array: &[T]) -> (i32, Option<T>)
+where
+    T: Hash + Ord + Eq + Copy,
+{
+    let mut hash_map: HashMap<&T, i32> = HashMap::new();
+    array.iter().for_each(|t| {
+        hash_map.entry(t).and_modify(|v| *v += 1).or_insert(0);
+    });
+    let (mut count, mut most_freq): (i32, Option<&T>) = (0, None);
+    for (v, c) in hash_map.into_iter() {
+        if c > count {
+            count = c;
+            let _ = most_freq.insert(v);
+        }
+    }
+    (count, most_freq.copied())
+}

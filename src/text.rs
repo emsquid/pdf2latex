@@ -266,4 +266,24 @@ impl Line {
     pub fn get_glyph_count(&self) -> u32 {
         self.words.iter().map(|word| word.glyphs.len() as u32).sum()
     }
+
+    pub fn get_margins(&self) -> (Option<u32>, Option<u32>) {
+        (self.get_left_margin(), self.get_right_margin())
+    }
+
+    /// Compute the relative margin of the last glyph of the line
+    pub fn get_right_margin(&self) -> Option<u32> {
+        self.words
+            .last()
+            .and_then(|word| word.glyphs.last())
+            .and_then(|glyph| Some(glyph.rect.width + glyph.rect.x))
+    }
+
+    /// Compute the relative margin of the first glyph of the line
+    pub fn get_left_margin(&self) -> Option<u32> {
+        self.words
+            .first()
+            .and_then(|word| word.glyphs.first())
+            .and_then(|glyph| Some(glyph.rect.x))
+    }
 }

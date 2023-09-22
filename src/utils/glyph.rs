@@ -221,24 +221,24 @@ impl KnownGlyph {
             vec![],
             false,
         );
-        let (base, _code, size, styles, modifiers, math) = data;
+        let (base, _code, size, styles, modifiers, math) = &data;
         let (_p_base, _p_code, p_size, p_styles, _p_modifiers, p_math) =
-            prev.clone().unwrap_or(default.clone());
+            prev.as_ref().unwrap_or(&default);
         let (_n_base, _n_code, n_size, n_styles, _n_modifiers, n_math) =
-            next.clone().unwrap_or(default.clone());
+            next.as_ref().unwrap_or(&default);
 
         let mut result = String::new();
 
         if size != p_size || math != p_math || styles != p_styles {
-            if size != Size::Normalsize && !math {
+            if size != &Size::Normalsize && !math {
                 result.push_str(&format!("{{\\{size} "));
             }
 
-            if math && !p_math {
+            if *math && !p_math {
                 result.push('$');
             }
 
-            for &style in &styles {
+            for &style in styles {
                 if style != Style::Normal {
                     result.push_str(&format!("\\{style}{{"));
                 }
@@ -251,24 +251,27 @@ impl KnownGlyph {
                 .fold(base.clone(), |acc, modif| format!("\\{modif}{{{acc}}}")),
         );
 
-        if base.starts_with('\\') && n_math && !end {
+        if base.starts_with('\\') && *n_math && !end {
             result.push(' ');
         }
 
         if size != n_size || math != n_math || styles != n_styles {
-            for &style in &styles {
+            for &style in styles {
                 if style != Style::Normal {
                     result.push('}');
                 }
             }
 
-            if math && !n_math {
+            if *math && !n_math {
                 result.push('$');
             }
 
-            if size != Size::Normalsize && !math {
+            if size != &Size::Normalsize && !math {
                 result.push('}');
             }
+        }
+        if end {
+            // println!("this char ends : {}", base);
         }
 
         result
