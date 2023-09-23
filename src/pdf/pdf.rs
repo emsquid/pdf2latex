@@ -38,7 +38,6 @@ impl Pdf {
         }
         self.clean();
 
-
         if args.verbose {
             std::io::stdout().write_all(b"\n")?;
         }
@@ -49,12 +48,16 @@ impl Pdf {
     /// Compute the overall margin of a Pdf
     #[must_use]
     pub fn get_margin(&self) -> f32 {
+        let mut i = 0;
         self.pages
             .iter()
             .map(|page| {
                 page.lines
                     .iter()
-                    .map(|line| line.words[0].rect.x)
+                    .map(|line| {
+                        i += 1;
+                        line.try_lock().unwrap().words[0].rect.x
+                    })
                     .min()
                     .unwrap_or(0)
             })

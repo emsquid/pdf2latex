@@ -33,8 +33,6 @@ impl LaTeX {
     /// # Errors
     /// Fails if cannot write into the file
     pub fn save(&self, path: &PathBuf) -> Result<()> {
-        std::fs::write(path, &self.content)?;
-
-        Ok(())
+        Ok(std::fs::write(path, &self.content)?)
     }
 }

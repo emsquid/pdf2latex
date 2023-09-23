@@ -5,6 +5,7 @@ use crate::pdf::Line;
 use crate::utils::{find_parts, log, most_frequent, Rect};
 use anyhow::Result;
 use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
+use std::sync::{Arc, Mutex};
 use std::{io::Write, time};
 
 const LINE_SPACING: u32 = 10;
@@ -12,7 +13,7 @@ const LINE_SPACING: u32 = 10;
 /// A Page from a Pdf, it holds an image and multiple lines
 pub struct Page {
     pub image: DynamicImage,
-    pub lines: Vec<Line>,
+    pub lines: Vec<Arc<Mutex<Line>>>,
 }
 
 impl Page {
@@ -26,12 +27,12 @@ impl Page {
     }
 
     /// Find the different lines in an image
-    fn find_lines(image: &DynamicImage) -> Vec<Line> {
+    fn find_lines(image: &DynamicImage) -> Vec<Arc<Mutex<Line>>> {
         find_parts(&image.to_luma8(), LINE_SPACING)
             .into_iter()
             .map(|(start, end)| {
                 let rect = Rect::new(0, start, image.width(), end - start + 1);
-                Line::from(rect, image)
+                Arc::new(Mutex::new(Line::from(rect, image)))
             })
             .collect()
     }
@@ -56,7 +57,11 @@ impl Page {
             let mut handles = Vec::new();
             for line in &mut self.lines {
                 // Use a thread to guess the content of several lines concurrently
-                let handle = scope.spawn(move || line.guess(fontbase));
+                let handle = scope.spawn(move || {
+                    line.lock().unwrap().guess(fontbase);
+                });
+                // let handle = scope.spawn(move || <&mut RefCell<Line> as Borrow<Borrowed>>::borrow(&line).guess(fontbase));
+                // <&mut RefCell<Line> as Borrow<Line>>::borrow(&line).guess(fontbase)
                 handles.push(handle);
 
                 // Control the number of threads created
@@ -89,7 +94,7 @@ impl Page {
     pub fn get_content(&self) -> String {
         self.lines
             .iter()
-            .map(Line::get_content)
+            .map(|line| line.lock().unwrap().get_content())
             .collect::<Vec<String>>()
             .join("\n")
     }
@@ -99,14 +104,14 @@ impl Page {
         let right_margins = self
             .lines
             .iter()
-            .filter_map(Line::get_right_margin)
+            .filter_map(|line| line.lock().unwrap().get_right_margin())
             .collect::<Vec<u32>>();
         let right_margin_mode = most_frequent(&right_margins, 0).0;
 
         let left_margins = self
             .lines
             .iter()
-            .filter_map(Line::get_left_margin)
+            .filter_map(|line| line.lock().unwrap().get_left_margin())
             .collect::<Vec<u32>>();
         let left_margin_mode = most_frequent(&left_margins, 0).0;
 
@@ -114,15 +119,25 @@ impl Page {
             .iter()
             .enumerate()
             .map(|(i, line)| {
-                let prev = self.lines.get(i - 1).and_then(Line::get_last_guess);
-                let next = self.lines.get(i + 1).and_then(Line::get_first_guess);
+                let prev = self
+                    .lines
+                    .get(i - 1)
+                    .and_then(|line| line.lock().unwrap().get_last_guess());
+                let next = self
+                    .lines
+                    .get(i + 1)
+                    .and_then(|line| line.lock().unwrap().get_first_guess());
                 let newline = if line
+                    .lock()
+                    .unwrap()
                     .get_right_margin()
                     .is_some_and(|margin| margin < right_margin_mode - 10)
-                    && line.can_have_new_line
+                    && line.lock().unwrap().can_have_new_line
                 {
                     if self.lines.get(i + 1).is_some_and(|line| {
-                        line.get_left_margin()
+                        line.lock()
+                            .unwrap()
+                            .get_left_margin()
                             .is_some_and(|margin| margin < left_margin_mode + 10)
                     }) {
                         "\\\\"
@@ -132,7 +147,11 @@ impl Page {
                 } else {
                     ""
                 };
-                format!("\n    {}{}", line.get_latex(&prev, &next), newline)
+                format!(
+                    "\n    {}{}",
+                    line.lock().unwrap().get_latex(&prev, &next),
+                    newline
+                )
             })
             .collect()
     }
@@ -143,16 +162,18 @@ impl Page {
         let mut copy = self.image.clone();
         let mut alt = 0;
         for line in &self.lines {
-            let sub = image::RgbaImage::from_pixel(line.rect.width, 1, Rgba([255, 0, 255, 255]));
+            let unlock_line = line.lock().unwrap();
+            let sub =
+                image::RgbaImage::from_pixel(unlock_line.rect.width, 1, Rgba([255, 0, 255, 255]));
 
             overlay(
                 &mut copy,
                 &sub,
-                i64::from(line.rect.x),
-                i64::from(line.baseline),
+                i64::from(unlock_line.rect.x),
+                i64::from(unlock_line.baseline),
             );
 
-            for word in &line.words {
+            for word in &unlock_line.words {
                 for glyph in &word.glyphs {
                     alt = (alt + 1) % 4;
                     let color = match alt {
@@ -178,7 +199,7 @@ impl Page {
                                     };
                                     copy.put_pixel(
                                         glyph.rect.x + x,
-                                        (line.baseline + y - glyph.rect.height)
+                                        (unlock_line.baseline + y - glyph.rect.height)
                                             .saturating_add_signed(guess.offset),
                                         c,
                                     );
@@ -191,7 +212,7 @@ impl Page {
                         &mut copy,
                         &sub,
                         i64::from(glyph.rect.x),
-                        i64::from(line.rect.y + line.rect.height + 2),
+                        i64::from(unlock_line.rect.y + unlock_line.rect.height + 2),
                     );
                 }
                 let sub =
@@ -201,7 +222,7 @@ impl Page {
                     &mut copy,
                     &sub,
                     i64::from(word.rect.x),
-                    i64::from(line.rect.y + line.rect.height + 4),
+                    i64::from(unlock_line.rect.y + unlock_line.rect.height + 4),
                 );
             }
         }
@@ -212,37 +233,19 @@ impl Page {
     /// Compute the average distance between glyphs and their guesses, mostly for debugging
     pub fn debug_dist_avg(&self) {
         let data = self.lines.iter().fold((0., 0), |acc, line| {
-            (acc.0 + line.get_dist_sum(), acc.1 + line.get_glyph_count())
+            let n1 = acc.0 + line.lock().unwrap().get_dist_sum();
+            (n1, acc.1 + line.lock().unwrap().get_glyph_count())
         });
         println!("distance moyenne : {}", data.0 / data.1 as f32);
     }
 
+    /// Clean the pdf like removing trailing dashes
     pub fn clean(&mut self) {
         for i in 0..self.lines.len() {
-            // Remove trailing "-", check if last Glyph if the current line is a "-"
-            let clean_objects = self.lines.get_mut(i).unwrap().get_clean_objects();
-            for clean_object in clean_objects {
-                match clean_object {
-                    super::line::ObjectClean::TrailingDash => {
-                        if self
-                            .lines
-                            .get(i + 1)
-                            .is_some_and(|line| line.words.first().is_some())
-                        {
-                            let word = self.lines.get_mut(i + 1).unwrap().words.remove(0);
-                            // TODO more than just add items
-                            self.lines
-                                .get_mut(i)
-                                .unwrap()
-                                .words
-                                .last_mut()
-                                .unwrap()
-                                .glyphs
-                                .extend(word.glyphs);
-                        }
-                    }
-                }
-            }
+            self.lines.get(i).unwrap().lock().unwrap().clean(
+                self.lines.get(i - 1).map(|line| line.clone()),
+                self.lines.get(i + 1).map(|line| line.clone()),
+            );
         }
     }
 }
