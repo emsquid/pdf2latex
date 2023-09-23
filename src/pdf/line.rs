@@ -6,10 +6,15 @@ use image::DynamicImage;
 
 const WORD_SPACING: u32 = 15;
 
+pub enum ObjectClean {
+    TrailingDash,
+}
+
 /// A Line from a Page from a Pdf
 pub struct Line {
     pub rect: Rect,
     pub baseline: u32,
+    pub can_have_new_line: bool,
 
     pub words: Vec<Word>,
 }
@@ -24,6 +29,7 @@ impl Line {
         Line {
             rect,
             baseline,
+            can_have_new_line: true,
             words,
         }
     }
@@ -128,7 +134,8 @@ impl Line {
     pub fn get_right_margin(&self) -> Option<u32> {
         self.words
             .last()
-            .and_then(|word| word.glyphs.last()).map(|glyph| glyph.rect.width + glyph.rect.x)
+            .and_then(|word| word.glyphs.last())
+            .map(|glyph| glyph.rect.width + glyph.rect.x)
     }
 
     /// Compute the relative margin of the first glyph of the line
@@ -136,6 +143,23 @@ impl Line {
     pub fn get_left_margin(&self) -> Option<u32> {
         self.words
             .first()
-            .and_then(|word| word.glyphs.first()).map(|glyph| glyph.rect.x)
+            .and_then(|word| word.glyphs.first())
+            .map(|glyph| glyph.rect.x)
+    }
+
+    pub fn get_clean_objects(&mut self) -> Vec<ObjectClean> {
+        let mut object_clean = Vec::new();
+        let last_char = self
+            .words
+            .last()
+            .map(|word| word.get_content().chars().last());
+        if last_char.is_some_and(|c| c.is_some_and(|c| c == '-')) {
+            // TODO remove trailing dash from image
+            // TODO FIX : image is not in place so newline is inserted add values to avoid this
+            self.words.last_mut().unwrap().glyphs.pop();
+            self.can_have_new_line = false;
+            object_clean.push(ObjectClean::TrailingDash);
+        }
+        object_clean
     }
 }

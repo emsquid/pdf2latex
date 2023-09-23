@@ -36,6 +36,8 @@ impl Pdf {
 
             page.guess(&fontbase, args)?;
         }
+        self.clean();
+
 
         if args.verbose {
             std::io::stdout().write_all(b"\n")?;
@@ -73,5 +75,11 @@ impl Pdf {
     /// Get the `LateX` of a Pdf
     pub fn get_latex(&self) -> String {
         self.pages.iter().map(Page::get_latex).collect()
+    }
+
+    pub fn clean(&mut self) {
+        for page in self.pages.iter_mut() {
+            page.clean();
+        }
     }
 }
