@@ -9,3 +9,4 @@ test/*
 
 target
 Cargo.lock
+python/python-env/
