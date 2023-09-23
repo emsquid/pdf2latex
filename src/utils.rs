@@ -2,8 +2,9 @@ use anyhow::{anyhow, Result};
 use image::{DynamicImage, GrayImage};
 use std::cmp::Ordering;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::str::from_utf8;
 use std::{collections::HashMap, hash::Hash};
 
 /// A Rectangle in 2D
@@ -174,7 +175,7 @@ pub fn most_frequent<T: Hash + Eq + Copy>(array: &[T], default: T) -> (T, i32) {
 
 /// Round a value to a certain number of digits
 #[must_use]
-pub fn round(value: f32, digits: u32) -> f32 {      
+pub fn round(value: f32, digits: u32) -> f32 {
     (value * (10.0_f32).powi(digits as i32)).round() / 10.0_f32.powi(digits as i32)
 }
 
@@ -223,4 +224,14 @@ pub fn log(
     stdout.flush()?;
 
     Ok(())
+}
+
+pub fn recognize_formula(_image: &GrayImage) -> anyhow::Result<String> {
+    // TODO save image the imqge should not contain spaces => ' '
+    let mut cmd = Command::new("bash");
+    let path = PathBuf::from("");
+    cmd.args(["python/recognize_formula.sh", &path.display().to_string()]);
+    let output = &cmd.output()?.stdout;
+    let output = from_utf8(output)?;
+    Ok(output.to_string())
 }
