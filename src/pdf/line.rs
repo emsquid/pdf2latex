@@ -1,6 +1,3 @@
-use std::sync::Arc;
-use std::sync::Mutex;
-
 use super::Word;
 use crate::fonts::FontBase;
 use crate::fonts::KnownGlyph;
@@ -144,31 +141,5 @@ impl Line {
             .first()
             .and_then(|word| word.glyphs.first())
             .map(|glyph| glyph.rect.x)
-    }
-
-    /// Clean the line including the next lines like removing trailing dashes
-    pub fn clean(
-        &mut self,
-        _previous_line: Option<Arc<Mutex<Line>>>,
-        next_line: Option<Arc<Mutex<Line>>>,
-    ) {
-        let last_char = self
-            .words
-            .last()
-            .map(|word| word.get_content().chars().last());
-        if last_char.is_some_and(|c| c.is_some_and(|c| c == '-')) {
-            // TODO remove trailing dash from image
-            // TODO FIX : image is not in place so newline is inserted add values to avoid this
-            self.words.last_mut().unwrap().glyphs.pop();
-            self.can_have_new_line = false;
-            if next_line
-                .as_ref()
-                .is_some_and(|line| line.lock().unwrap().words.first().is_some())
-            {
-                let word = next_line.unwrap().lock().unwrap().words.remove(0);
-                // TODO more than just add items
-                self.words.last_mut().unwrap().glyphs.extend(word.glyphs);
-            }
-        }
     }
 }

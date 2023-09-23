@@ -5,7 +5,6 @@ use crate::pdf::Line;
 use crate::utils::{find_parts, log, most_frequent, Rect};
 use anyhow::Result;
 use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
-use std::sync::{Arc, Mutex};
 use std::{io::Write, time};
 
 const LINE_SPACING: u32 = 10;
@@ -13,7 +12,7 @@ const LINE_SPACING: u32 = 10;
 /// A Page from a Pdf, it holds an image and multiple lines
 pub struct Page {
     pub image: DynamicImage,
-    pub lines: Vec<Arc<Mutex<Line>>>,
+    pub lines: Vec<Line>,
 }
 
 impl Page {
@@ -27,12 +26,12 @@ impl Page {
     }
 
     /// Find the different lines in an image
-    fn find_lines(image: &DynamicImage) -> Vec<Arc<Mutex<Line>>> {
+    fn find_lines(image: &DynamicImage) -> Vec<Line> {
         find_parts(&image.to_luma8(), LINE_SPACING)
             .into_iter()
             .map(|(start, end)| {
                 let rect = Rect::new(0, start, image.width(), end - start + 1);
-                Arc::new(Mutex::new(Line::from(rect, image)))
+                Line::from(rect, image)
             })
             .collect()
     }
@@ -58,7 +57,7 @@ impl Page {
             for line in &mut self.lines {
                 // Use a thread to guess the content of several lines concurrently
                 let handle = scope.spawn(move || {
-                    line.lock().unwrap().guess(fontbase);
+                    line.guess(fontbase);
                 });
                 // let handle = scope.spawn(move || <&mut RefCell<Line> as Borrow<Borrowed>>::borrow(&line).guess(fontbase));
                 // <&mut RefCell<Line> as Borrow<Line>>::borrow(&line).guess(fontbase)
@@ -94,7 +93,7 @@ impl Page {
     pub fn get_content(&self) -> String {
         self.lines
             .iter()
-            .map(|line| line.lock().unwrap().get_content())
+            .map(|line| line.get_content())
             .collect::<Vec<String>>()
             .join("\n")
     }
@@ -104,14 +103,14 @@ impl Page {
         let right_margins = self
             .lines
             .iter()
-            .filter_map(|line| line.lock().unwrap().get_right_margin())
+            .filter_map(|line| line.get_right_margin())
             .collect::<Vec<u32>>();
         let right_margin_mode = most_frequent(&right_margins, 0).0;
 
         let left_margins = self
             .lines
             .iter()
-            .filter_map(|line| line.lock().unwrap().get_left_margin())
+            .filter_map(|line| line.get_left_margin())
             .collect::<Vec<u32>>();
         let left_margin_mode = most_frequent(&left_margins, 0).0;
 
@@ -119,25 +118,18 @@ impl Page {
             .iter()
             .enumerate()
             .map(|(i, line)| {
-                let prev = self
-                    .lines
-                    .get(i - 1)
-                    .and_then(|line| line.lock().unwrap().get_last_guess());
+                let prev = self.lines.get(i - 1).and_then(|line| line.get_last_guess());
                 let next = self
                     .lines
                     .get(i + 1)
-                    .and_then(|line| line.lock().unwrap().get_first_guess());
+                    .and_then(|line| line.get_first_guess());
                 let newline = if line
-                    .lock()
-                    .unwrap()
                     .get_right_margin()
                     .is_some_and(|margin| margin < right_margin_mode - 10)
-                    && line.lock().unwrap().can_have_new_line
+                    && line.can_have_new_line
                 {
                     if self.lines.get(i + 1).is_some_and(|line| {
-                        line.lock()
-                            .unwrap()
-                            .get_left_margin()
+                        line.get_left_margin()
                             .is_some_and(|margin| margin < left_margin_mode + 10)
                     }) {
                         "\\\\"
@@ -147,11 +139,7 @@ impl Page {
                 } else {
                     ""
                 };
-                format!(
-                    "\n    {}{}",
-                    line.lock().unwrap().get_latex(&prev, &next),
-                    newline
-                )
+                format!("\n    {}{}", line.get_latex(&prev, &next), newline)
             })
             .collect()
     }
@@ -162,7 +150,7 @@ impl Page {
         let mut copy = self.image.clone();
         let mut alt = 0;
         for line in &self.lines {
-            let unlock_line = line.lock().unwrap();
+            let unlock_line = line;
             let sub =
                 image::RgbaImage::from_pixel(unlock_line.rect.width, 1, Rgba([255, 0, 255, 255]));
 
@@ -233,8 +221,8 @@ impl Page {
     /// Compute the average distance between glyphs and their guesses, mostly for debugging
     pub fn debug_dist_avg(&self) {
         let data = self.lines.iter().fold((0., 0), |acc, line| {
-            let n1 = acc.0 + line.lock().unwrap().get_dist_sum();
-            (n1, acc.1 + line.lock().unwrap().get_glyph_count())
+            let n1 = acc.0 + line.get_dist_sum();
+            (n1, acc.1 + line.get_glyph_count())
         });
         println!("distance moyenne : {}", data.0 / data.1 as f32);
     }
@@ -242,10 +230,32 @@ impl Page {
     /// Clean the pdf like removing trailing dashes
     pub fn clean(&mut self) {
         for i in 0..self.lines.len() {
-            self.lines.get(i).unwrap().lock().unwrap().clean(
-                self.lines.get(i - 1).map(|line| line.clone()),
-                self.lines.get(i + 1).map(|line| line.clone()),
-            );
+            let current_line = self.lines.get_mut(i).unwrap();
+            let last_char = current_line
+                .words
+                .last()
+                .map(|word| word.get_content().chars().last());
+            if last_char.is_some_and(|c| c.is_some_and(|c| c == '-')) {
+                // TODO remove trailing dash from image
+                // TODO FIX : image is not in place so newline is inserted add values to avoid this
+                current_line.words.last_mut().unwrap().glyphs.pop();
+                current_line.can_have_new_line = false;
+                let mut next_line: Option<&mut Line> = self.lines.get_mut(i + 1);
+                if next_line
+                    .as_ref()
+                    .is_some_and(|line| line.words.first().is_some())
+                {
+                    let word = next_line.as_mut().unwrap().words.remove(0);
+                    // TODO more than just add items
+                    let current_line = self.lines.get_mut(i).unwrap();
+                    current_line
+                        .words
+                        .last_mut()
+                        .unwrap()
+                        .glyphs
+                        .extend(word.glyphs);
+                }
+            }
         }
     }
 }

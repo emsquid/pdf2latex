@@ -56,7 +56,7 @@ impl Pdf {
                     .iter()
                     .map(|line| {
                         i += 1;
-                        line.try_lock().unwrap().words[0].rect.x
+                        line.words[0].rect.x
                     })
                     .min()
                     .unwrap_or(0)
