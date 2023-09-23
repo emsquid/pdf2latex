@@ -1,7 +1,8 @@
 use super::Word;
 use crate::fonts::FontBase;
-use crate::fonts::KnownGlyph;
+use crate::fonts::{KnownGlyph, DIST_THRESHOLD};
 use crate::utils::{find_parts, most_frequent, Rect};
+use crate::vit::Model;
 use image::DynamicImage;
 
 const WORD_SPACING: u32 = 15;
@@ -93,17 +94,23 @@ impl Line {
         self.words
             .iter()
             .enumerate()
-            .map(|(i, word)| {
-                let prev = self
-                    .words
-                    .get(i - 1)
-                    .map_or(prev.clone(), Word::get_last_guess);
-                let next = self
-                    .words
-                    .get(i + 1)
-                    .map_or(next.clone(), Word::get_first_guess);
+            .flat_map(|(i, word)| {
+                if true || word.get_dist_sum() / (word.glyphs.len() as f32) < DIST_THRESHOLD * 4.0 {
+                    let prev = self
+                        .words
+                        .get(i - 1)
+                        .map_or(prev.clone(), Word::get_last_guess);
+                    let next = self
+                        .words
+                        .get(i + 1)
+                        .map_or(next.clone(), Word::get_first_guess);
 
-                word.get_latex(&prev, &next)
+                    Ok(word.get_latex(&prev, &next))
+                } else {
+                    let latex = Model::predict(word);
+                    println!("{latex:?}");
+                    latex.map(|r| format!("${r}$"))
+                }
             })
             .collect::<Vec<String>>()
             .join(" ")

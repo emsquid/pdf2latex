@@ -1,8 +1,8 @@
 use super::{code::Code, size::Size, style::Style};
 use crate::fonts::FontBase;
 use crate::utils::{find_parts, flood_fill, Rect};
-use anyhow::Result;
-use image::{DynamicImage, GenericImageView, Pixel, Rgb, RgbImage};
+use anyhow::{anyhow, Result};
+use image::{DynamicImage, GenericImageView, GrayImage, Pixel, Rgb, RgbImage};
 use std::{collections::HashMap, process::Command};
 
 pub const DIST_UNALIGNED_THRESHOLD: f32 = 32.;
@@ -15,6 +15,16 @@ pub trait Glyph {
     fn rect(&self) -> &Rect;
     /// Return the image of the glyph
     fn image(&self) -> &Vec<u8>;
+    /// Return the image of the glyph as a `DynamicImage`
+    fn dynamic_image(&self) -> Result<DynamicImage> {
+        let (width, height) = (self.rect().width, self.rect().height);
+        let gray = GrayImage::from_raw(width, height, self.image().to_vec());
+        if let Some(gray) = gray {
+            Ok(DynamicImage::ImageLuma8(gray))
+        } else {
+            Err(anyhow!("Unable to convert image to DynamicImage"))
+        }
+    }
 
     /// Return grayscale of the pixel at the given coordinates,
     /// if outside of the rect return 1.
@@ -84,16 +94,14 @@ pub trait Glyph {
     ///
     /// Save the glyph image at the given path
     fn save(&self, path: &str) -> Result<()> {
-        image::save_buffer_with_format(
+        Ok(image::save_buffer_with_format(
             path,
             self.image(),
             self.rect().width,
             self.rect().height,
             image::ColorType::L8,
             image::ImageFormat::Png,
-        )?;
-
-        Ok(())
+        )?)
     }
 }
 

@@ -1,8 +1,8 @@
 use crate::fonts::FontBase;
-use crate::fonts::{
-    Glyph, KnownGlyph, UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD, DIST_UNALIGNED_THRESHOLD,
-};
+use crate::fonts::{Glyph, KnownGlyph, UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD};
 use crate::utils::Rect;
+use anyhow::Result;
+use image::imageops::FilterType;
 use image::DynamicImage;
 
 const WORD_SPACING: u32 = 15;
@@ -105,23 +105,33 @@ impl Word {
         }
 
         // The worst one are checked without paying attention to their offset
-        for glyph in &mut self.glyphs {
-            if glyph.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
-                glyph.try_guess(fontbase, baseline, false);
-            }
-        }
+        // for glyph in &mut self.glyphs {
+        // if glyph.dist.unwrap_or(f32::INFINITY) > DIST_UNALIGNED_THRESHOLD {
+        // glyph.try_guess(fontbase, baseline, false);
+        // }
+        // }
     }
 
     /// Get the guess for the first glyph in a Word
     #[must_use]
     pub fn get_first_guess(&self) -> Option<KnownGlyph> {
-        self.glyphs.first().and_then(|glyph| glyph.guess.clone())
+        // TODO: Temporary fix
+        if self.get_dist_sum() / (self.glyphs.len() as f32) < DIST_THRESHOLD * 4.0 {
+            self.glyphs.first().and_then(|glyph| glyph.guess.clone())
+        } else {
+            None
+        }
     }
 
     /// Get the guess for the last glyph in a Word
     #[must_use]
     pub fn get_last_guess(&self) -> Option<KnownGlyph> {
-        self.glyphs.last().and_then(|glyph| glyph.guess.clone())
+        // TODO: Temporary fix
+        if self.get_dist_sum() / (self.glyphs.len() as f32) < DIST_THRESHOLD * 4.0 {
+            self.glyphs.last().and_then(|glyph| glyph.guess.clone())
+        } else {
+            None
+        }
     }
 
     /// Get the content of a Word, mostly for debugging
@@ -160,5 +170,18 @@ impl Word {
             .iter()
             .map(|glyph| glyph.dist.unwrap_or(0.))
             .sum()
+    }
+
+    /// Save the word as an image
+    pub fn save(&self, path: &str) -> Result<()> {
+        let mut joined = self.glyphs[0].clone();
+        for glyph in &self.glyphs {
+            joined = joined.join(glyph);
+        }
+
+        let image = joined.dynamic_image()?;
+        Ok(image
+            .resize(image.width() / 2, image.height() / 2, FilterType::Lanczos3)
+            .save(path)?)
     }
 }

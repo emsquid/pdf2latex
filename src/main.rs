@@ -18,7 +18,7 @@ fn process(args: &MainArg) -> Result<()> {
 
     // Do some debugging
     pdf.pages[0].debug_dist_avg();
-    pdf.pages[0].debug_image().save("./test/debug.png")?;
+    // pdf.pages[0].debug_image().save("./test/debug.png")?;
 
     Ok(())
 }

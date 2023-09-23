@@ -56,11 +56,7 @@ impl Page {
             let mut handles = Vec::new();
             for line in &mut self.lines {
                 // Use a thread to guess the content of several lines concurrently
-                let handle = scope.spawn(move || {
-                    line.guess(fontbase);
-                });
-                // let handle = scope.spawn(move || <&mut RefCell<Line> as Borrow<Borrowed>>::borrow(&line).guess(fontbase));
-                // <&mut RefCell<Line> as Borrow<Line>>::borrow(&line).guess(fontbase)
+                let handle = scope.spawn(move || line.guess(fontbase));
                 handles.push(handle);
 
                 // Control the number of threads created
@@ -103,14 +99,14 @@ impl Page {
         let right_margins = self
             .lines
             .iter()
-            .filter_map(|line| line.get_right_margin())
+            .filter_map(Line::get_right_margin)
             .collect::<Vec<u32>>();
         let right_margin_mode = most_frequent(&right_margins, 0).0;
 
         let left_margins = self
             .lines
             .iter()
-            .filter_map(|line| line.get_left_margin())
+            .filter_map(Line::get_left_margin)
             .collect::<Vec<u32>>();
         let left_margin_mode = most_frequent(&left_margins, 0).0;
 
@@ -118,11 +114,8 @@ impl Page {
             .iter()
             .enumerate()
             .map(|(i, line)| {
-                let prev = self.lines.get(i - 1).and_then(|line| line.get_last_guess());
-                let next = self
-                    .lines
-                    .get(i + 1)
-                    .and_then(|line| line.get_first_guess());
+                let prev = self.lines.get(i - 1).and_then(Line::get_last_guess);
+                let next = self.lines.get(i + 1).and_then(Line::get_first_guess);
                 let newline = if line
                     .get_right_margin()
                     .is_some_and(|margin| margin < right_margin_mode - 10)
@@ -227,20 +220,18 @@ impl Page {
         println!("distance moyenne : {}", data.0 / data.1 as f32);
     }
 
-    /// Clean the pdf like removing trailing dashes
+    /// Clean the pdf, like removing trailing dashes
     pub fn clean(&mut self) {
         for i in 0..self.lines.len() {
             let current_line = self.lines.get_mut(i).unwrap();
-            let last_char = current_line
-                .words
-                .last()
-                .map(|word| word.get_content().chars().last());
-            if last_char.is_some_and(|c| c.is_some_and(|c| c == '-')) {
+            let last_word = current_line.words.last();
+            let last_char = last_word.map(|word| word.get_content().chars().last());
+            if last_char == Some(Some('-')) {
                 // TODO remove trailing dash from image
                 // TODO FIX : image is not in place so newline is inserted add values to avoid this
                 current_line.words.last_mut().unwrap().glyphs.pop();
                 current_line.can_have_new_line = false;
-                let mut next_line: Option<&mut Line> = self.lines.get_mut(i + 1);
+                let mut next_line = self.lines.get_mut(i + 1);
                 if next_line
                     .as_ref()
                     .is_some_and(|line| line.words.first().is_some())
@@ -248,12 +239,8 @@ impl Page {
                     let word = next_line.as_mut().unwrap().words.remove(0);
                     // TODO more than just add items
                     let current_line = self.lines.get_mut(i).unwrap();
-                    current_line
-                        .words
-                        .last_mut()
-                        .unwrap()
-                        .glyphs
-                        .extend(word.glyphs);
+                    let last_word = current_line.words.last_mut().unwrap();
+                    last_word.glyphs.extend(word.glyphs);
                 }
             }
         }

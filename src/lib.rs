@@ -29,3 +29,9 @@ pub mod fonts {
     pub use size::Size;
     pub use style::Style;
 }
+
+pub mod vit {
+    pub mod model;
+    // Reexport struct
+    pub use model::Model;
+}

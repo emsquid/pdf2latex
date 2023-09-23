@@ -46,6 +46,7 @@ impl Pdf {
     }
 
     /// Compute the overall margin of a Pdf
+    /// TODO: Change this to something better, maybe return (f32, f32, f32, f32)
     #[must_use]
     pub fn get_margin(&self) -> f32 {
         let mut i = 0;
