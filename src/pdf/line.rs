@@ -1,8 +1,7 @@
 use super::Word;
 use crate::fonts::FontBase;
-use crate::fonts::{KnownGlyph, DIST_THRESHOLD};
+use crate::fonts::KnownGlyph;
 use crate::utils::{find_parts, most_frequent, Rect};
-use crate::vit::Model;
 use image::DynamicImage;
 
 const WORD_SPACING: u32 = 15;
@@ -94,23 +93,17 @@ impl Line {
         self.words
             .iter()
             .enumerate()
-            .flat_map(|(i, word)| {
-                if true || word.get_dist_sum() / (word.glyphs.len() as f32) < DIST_THRESHOLD * 4.0 {
-                    let prev = self
-                        .words
-                        .get(i - 1)
-                        .map_or(prev.clone(), Word::get_last_guess);
-                    let next = self
-                        .words
-                        .get(i + 1)
-                        .map_or(next.clone(), Word::get_first_guess);
+            .map(|(i, word)| {
+                let prev = self
+                    .words
+                    .get(i - 1)
+                    .map_or(prev.clone(), Word::get_last_guess);
+                let next = self
+                    .words
+                    .get(i + 1)
+                    .map_or(next.clone(), Word::get_first_guess);
 
-                    Ok(word.get_latex(&prev, &next))
-                } else {
-                    let latex = Model::predict(word);
-                    println!("{latex:?}");
-                    latex.map(|r| format!("${r}$"))
-                }
+                word.get_latex(&prev, &next)
             })
             .collect::<Vec<String>>()
             .join(" ")
@@ -148,5 +141,54 @@ impl Line {
             .first()
             .and_then(|word| word.glyphs.first())
             .map(|glyph| glyph.rect.x)
+    }
+
+    pub fn get_bottom(&self) -> Option<u32> {
+        self.words
+            .iter()
+            .map(|word| word.rect.y + word.rect.height)
+            .min()
+    }
+
+    pub fn get_top(&self) -> Option<u32> {
+        self.words.iter().map(|word| word.rect.y).max()
+    }
+
+    pub fn search_words(&self, pattern: &str) -> Vec<usize> {
+        self.words
+            .iter()
+            .enumerate()
+            .flat_map(|(i, word)| {
+                if word.get_content() == pattern {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn pop_words_in_rect(&mut self, rect: &Rect) {
+        let mut index_to_pop = Vec::new();
+        for (i, word) in self.words.iter_mut().enumerate() {
+            if rect.contains(&word.rect) {
+                index_to_pop.push(i);
+            }
+        }
+
+        for i in 0..index_to_pop.len() {
+            println!(
+                "removing {}",
+                self.words
+                    .get(index_to_pop.get(i).unwrap() - i)
+                    .unwrap()
+                    .get_content()
+            );
+            self.words.remove(index_to_pop.get(i).unwrap() - i);
+        }
+    }
+
+    pub fn count_glyphes(&self) -> usize {
+        self.words.iter().map(|word| word.glyphs.len()).sum()
     }
 }

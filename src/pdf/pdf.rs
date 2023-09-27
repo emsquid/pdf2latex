@@ -36,7 +36,7 @@ impl Pdf {
 
             page.guess(&fontbase, args)?;
         }
-        self.clean();
+        self.clean()?;
 
         if args.verbose {
             std::io::stdout().write_all(b"\n")?;
@@ -55,9 +55,9 @@ impl Pdf {
             .map(|page| {
                 page.lines
                     .iter()
-                    .map(|line| {
+                    .flat_map(|line| {
                         i += 1;
-                        line.words[0].rect.x
+                        line.words.get(0).map(|word| word.rect.x)
                     })
                     .min()
                     .unwrap_or(0)
@@ -81,9 +81,10 @@ impl Pdf {
         self.pages.iter().map(Page::get_latex).collect()
     }
 
-    pub fn clean(&mut self) {
+    pub fn clean(&mut self) -> Result<()> {
         for page in self.pages.iter_mut() {
-            page.clean();
+            page.clean()?;
         }
+        Ok(())
     }
 }

@@ -11,6 +11,7 @@ const WORD_SPACING: u32 = 15;
 pub struct Word {
     pub rect: Rect,
     pub glyphs: Vec<UnknownGlyph>,
+    pub latex: Option<String>,
 }
 
 impl Word {
@@ -19,6 +20,7 @@ impl Word {
         Word {
             rect,
             glyphs: Word::find_glyphs(rect, image),
+            latex: None,
         }
     }
 
@@ -149,6 +151,9 @@ impl Word {
     /// Get the LaTeX for a Word
     #[must_use]
     pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
+        if let Some(l) = &self.latex {
+            return l.to_owned();
+        }
         self.glyphs
             .iter()
             .enumerate()

@@ -2,9 +2,8 @@ use anyhow::{anyhow, Result};
 use image::{DynamicImage, GrayImage};
 use std::cmp::Ordering;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
-use std::str::from_utf8;
 use std::{collections::HashMap, hash::Hash};
 
 /// A Rectangle in 2D
@@ -32,6 +31,12 @@ impl Rect {
     #[must_use]
     pub fn crop(&self, image: &DynamicImage) -> DynamicImage {
         image.crop_imm(self.x, self.y, self.width, self.height)
+    }
+
+    pub fn contains(&self, rect: &Rect) -> bool {
+        return (self.x <= rect.x && self.y <= rect.y)
+            && (self.x + self.width >= rect.x + rect.width)
+            && (self.y + self.height >= rect.y + rect.height);
     }
 }
 
@@ -224,14 +229,4 @@ pub fn log(
     stdout.flush()?;
 
     Ok(())
-}
-
-pub fn recognize_formula(_image: &GrayImage) -> anyhow::Result<String> {
-    // TODO save image the imqge should not contain spaces => ' '
-    let mut cmd = Command::new("bash");
-    let path = PathBuf::from("");
-    cmd.args(["python/recognize_formula.sh", &path.display().to_string()]);
-    let output = &cmd.output()?.stdout;
-    let output = from_utf8(output)?;
-    Ok(output.to_string())
 }
