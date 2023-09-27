@@ -1,14 +1,22 @@
-use crate::pdf::Word;
 use anyhow::Result;
+use image::DynamicImage;
 use std::process::Command;
 
 pub struct Model {}
 
 impl Model {
-    pub fn predict(word: &Word) -> Result<String> {
-        word.save("temp.png")?;
-        let output = Command::new("pix2tex").arg("temp.png").output()?.stdout;
-        let binding = String::from_utf8_lossy(&output);
+    pub fn predict(image: &DynamicImage) -> Result<String> {
+        image
+            .resize(
+                image.width() / 2,
+                image.height() / 2,
+                image::imageops::FilterType::Nearest,
+            )
+            .save("temp.png")?;
+        let mut cmd = Command::new("bash");
+        cmd.args(["python/recognize_formula.sh", "temp.png"]);
+        let output = &cmd.output()?.stdout;
+        let binding = String::from_utf8_lossy(output);
         let result = binding.split(":").nth(1).unwrap().trim();
         std::fs::remove_file("temp.png")?;
         Ok(result.to_string())

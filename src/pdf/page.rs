@@ -3,6 +3,7 @@ use crate::fonts::glyph::Glyph;
 use crate::fonts::FontBase;
 use crate::pdf::Line;
 use crate::utils::{find_parts, log, most_frequent, Rect};
+use crate::vit::Model;
 use anyhow::Result;
 use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
 use std::{io::Write, time};
@@ -96,20 +97,8 @@ impl Page {
 
     /// Get the LaTeX for a Page
     pub fn get_latex(&self) -> String {
-        let right_margins = self
-            .lines
-            .iter()
-            .filter_map(Line::get_right_margin)
-            .collect::<Vec<u32>>();
-        let right_margin_mode = most_frequent(&right_margins, 0).0;
-
-        let left_margins = self
-            .lines
-            .iter()
-            .filter_map(Line::get_left_margin)
-            .collect::<Vec<u32>>();
-        let left_margin_mode = most_frequent(&left_margins, 0).0;
-
+        let right_margin_mode = self.get_right_margin_mode();
+        let left_margin_mode = self.get_left_margin_mode();
         self.lines
             .iter()
             .enumerate()
@@ -132,7 +121,7 @@ impl Page {
                 } else {
                     ""
                 };
-                format!("\n    {}{}", line.get_latex(&prev, &next), newline)
+                format!("\n    {}{}", line.get_latex(&prev, &next,), newline)
             })
             .collect()
     }
@@ -221,7 +210,7 @@ impl Page {
     }
 
     /// Clean the pdf, like removing trailing dashes
-    pub fn clean(&mut self) {
+    pub fn clean(&mut self) -> Result<()> {
         for i in 0..self.lines.len() {
             let current_line = self.lines.get_mut(i).unwrap();
             let last_word = current_line.words.last();
@@ -231,6 +220,7 @@ impl Page {
                 // TODO FIX : image is not in place so newline is inserted add values to avoid this
                 current_line.words.last_mut().unwrap().glyphs.pop();
                 current_line.can_have_new_line = false;
+                drop(current_line);
                 let mut next_line = self.lines.get_mut(i + 1);
                 if next_line
                     .as_ref()
@@ -243,6 +233,94 @@ impl Page {
                     last_word.glyphs.extend(word.glyphs);
                 }
             }
+
+            let current_line = self.lines.get_mut(i).unwrap();
+            let searched_words = current_line.search_words("=");
+            drop(current_line);
+
+            if !searched_words.is_empty() {
+                let margins = (self.get_left_margin_mode(), self.get_right_margin_mode());
+                let (prev_line_some, next_line_some) =
+                    (self.lines.get(i - 1), self.lines.get(i + 1));
+                let mut y_top = prev_line_some.map(Line::get_bottom);
+                let mut y_bottom = next_line_some.map(Line::get_top);
+
+                if self.lines.get(i - 1).is_some() {
+                    let prev_line = prev_line_some.unwrap();
+                    if let Some(line_margin) = prev_line.get_left_margin() {
+                        if (line_margin as i32 - margins.0 as i32).abs() > 10
+                            && prev_line.count_glyphes() < 20
+                        {
+                            let _ = y_top.insert(prev_line.get_top());
+                        }
+                    }
+                }
+
+                if next_line_some.is_some() {
+                    let next_line = next_line_some.unwrap();
+                    if let Some(line_margin) = next_line.get_left_margin() {
+                        if (line_margin as i32 - margins.0 as i32).abs() > 10
+                            && next_line.count_glyphes() < 20
+                        {
+                            let _ = y_bottom.insert(next_line.get_bottom());
+                        }
+                    }
+                }
+                for words_index in searched_words {
+                    if let (Some(Some(top)), Some(Some(bottom))) = (y_top, y_bottom) {
+                        let current_line = self.lines.get_mut(i).unwrap();
+                        let word = current_line.words.get_mut(words_index);
+                        if word.is_none() {
+                            continue;
+                        }
+                        let word = word.unwrap();
+                        let rect = Rect::new(
+                            word.rect.x + word.rect.width,
+                            top,
+                            current_line.rect.width - word.rect.x,
+                            bottom - top,
+                        );
+                        let extracted_image = rect.crop(&self.image);
+                        let latex = Model::predict(&extracted_image)?;
+                        extracted_image.save(format!("test{}.png", top))?;
+                        let _ = word.latex.insert("= ".to_owned() + &latex + "$");
+                        current_line.pop_words_in_rect(&rect);
+                        self.lines
+                            .get_mut(i - 1)
+                            .map(|line| line.pop_words_in_rect(&rect));
+                        self.lines
+                            .get_mut(i + 1)
+                            .map(|line| line.pop_words_in_rect(&rect));
+                    }
+                }
+            }
         }
+        Ok(())
+    }
+
+    pub fn get_right_margin_mode(&self) -> u32 {
+        let right_margins = self
+            .lines
+            .iter()
+            .filter_map(Line::get_right_margin)
+            .collect::<Vec<u32>>();
+        most_frequent(&right_margins, 0).0
+    }
+
+    pub fn get_left_margin_mode(&self) -> u32 {
+        let left_margins = self
+            .lines
+            .iter()
+            .filter_map(Line::get_left_margin)
+            .collect::<Vec<u32>>();
+        most_frequent(&left_margins, 0).0
+    }
+
+    pub fn search_words(&self, pattern: &str) -> Vec<(usize, Vec<usize>)> {
+        self.lines
+            .iter()
+            .enumerate()
+            .map(|(i, line)| (i, line.search_words(pattern)))
+            .collect()
     }
 }

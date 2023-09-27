@@ -6,6 +6,7 @@ if [[ "$(basename "$pwd")" != "pdf2latex" ]];then
     exit
 fi
 if [[ ! -d "python/python-env" ]]; then
+    pix2tex "$1"
     echo "Error: Please setup python by running setup_python_ia.py"
     exit
 fi
