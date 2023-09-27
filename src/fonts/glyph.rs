@@ -6,7 +6,7 @@ use image::{DynamicImage, GenericImageView, GrayImage, Pixel, Rgb, RgbImage};
 use std::{collections::HashMap, process::Command};
 
 pub const DIST_UNALIGNED_THRESHOLD: f32 = 32.;
-pub const DIST_THRESHOLD: f32 = 8.;
+pub const DIST_THRESHOLD: f32 = 4.;
 pub const CHAR_THRESHOLD: u8 = 75;
 
 /// A Glyph represents the image for a character
@@ -441,7 +441,7 @@ impl UnknownGlyph {
                             }
 
                             if dist < DIST_THRESHOLD {
-                                continue 'outer;
+                                break 'outer;
                             }
                         }
                     }

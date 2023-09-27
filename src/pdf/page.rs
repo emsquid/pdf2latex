@@ -244,5 +244,16 @@ impl Page {
                 }
             }
         }
+
+        if self.lines.last().is_some_and(|line| {
+            line.words.len() == 1
+                && line.words[0].glyphs.len() == 1
+                && line.words[0].glyphs[0]
+                    .guess
+                    .clone()
+                    .is_some_and(|guess| guess.base.parse::<i32>().is_ok())
+        }) {
+            self.lines.remove(self.lines.len() - 1);
+        }
     }
 }
