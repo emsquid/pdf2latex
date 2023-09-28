@@ -1,6 +1,7 @@
 use super::Word;
 use crate::fonts::FontBase;
 use crate::fonts::KnownGlyph;
+use crate::fonts::DIST_THRESHOLD;
 use crate::utils::{find_parts, most_frequent, Rect};
 use image::DynamicImage;
 
@@ -176,19 +177,20 @@ impl Line {
             }
         }
 
-        for i in 0..index_to_pop.len() {
-            println!(
-                "removing {}",
-                self.words
-                    .get(index_to_pop.get(i).unwrap() - i)
-                    .unwrap()
-                    .get_content()
-            );
-            self.words.remove(index_to_pop.get(i).unwrap() - i);
+        for i in (0..index_to_pop.len()).rev() {
+            self.words.remove(*index_to_pop.get(i).unwrap());
         }
     }
 
     pub fn count_glyphes(&self) -> usize {
         self.words.iter().map(|word| word.glyphs.len()).sum()
+    }
+
+    pub fn is_full_line(&self, page_margins: (u32, u32)) -> bool {
+        if let (Some(left_margin), Some(right_margin)) = self.get_margins() {
+            return (left_margin as i32 - page_margins.0 as i32).abs() < 15
+                && (right_margin as i32 - page_margins.1 as i32).abs() < 15;
+        }
+        return false;
     }
 }

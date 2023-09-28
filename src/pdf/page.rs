@@ -1,7 +1,7 @@
 use crate::args::MainArg;
 use crate::fonts::glyph::Glyph;
 use crate::fonts::FontBase;
-use crate::pdf::Line;
+use crate::pdf::{Line, Word};
 use crate::utils::{find_parts, log, most_frequent, Rect};
 use crate::vit::Model;
 use anyhow::Result;
@@ -211,6 +211,10 @@ impl Page {
 
     /// Clean the pdf, like removing trailing dashes
     pub fn clean(&mut self) -> Result<()> {
+        let margins = (self.get_left_margin_mode(), self.get_right_margin_mode());
+        let mut lines_to_remove: Vec<u32> = Vec::new();
+        std::io::stdout().write_all(b"Cleaning the pdf (generating formulas, ...)")?;
+        std::io::stdout().flush()?;
         for i in 0..self.lines.len() {
             let current_line = self.lines.get_mut(i).unwrap();
             let last_word = current_line.words.last();
@@ -233,67 +237,70 @@ impl Page {
                 }
             }
 
-            let current_line = self.lines.get_mut(i).unwrap();
-            let searched_words = current_line.search_words("=");
+            let current_line = self.lines.get(i).unwrap();
+            let line_margin = (
+                current_line.get_left_margin(),
+                current_line.get_right_margin(),
+            );
 
-            if !searched_words.is_empty() {
-                let margins = (self.get_left_margin_mode(), self.get_right_margin_mode());
-                let (prev_line_some, next_line_some) =
-                    (self.lines.get(i - 1), self.lines.get(i + 1));
-                let mut y_top = prev_line_some.map(Line::get_bottom);
-                let mut y_bottom = next_line_some.map(Line::get_top);
+            if !current_line.is_full_line(margins) {
+                if let (Some(left_margin), Some(right_margin)) = line_margin {
+                    if margins.1 - right_margin < left_margin - margins.0 + 25 {
+                        let (prev_line_some, next_line_some) =
+                            (self.lines.get(i - 1), self.lines.get(i + 1));
+                        let mut y_top = prev_line_some.map(Line::get_bottom);
+                        let mut y_bottom = next_line_some.map(Line::get_top);
 
-                if self.lines.get(i - 1).is_some() {
-                    let prev_line = prev_line_some.unwrap();
-                    if let Some(line_margin) = prev_line.get_left_margin() {
-                        if (line_margin as i32 - margins.0 as i32).abs() > 10
-                            && prev_line.count_glyphes() < 20
-                        {
-                            let _ = y_top.insert(prev_line.get_top());
+                        if self.lines.get(i - 1).is_some() {
+                            let prev_line = prev_line_some.unwrap();
+                            if let Some(line_margin) = prev_line.get_left_margin() {
+                                if (line_margin as i32 - margins.0 as i32).abs() > 10
+                                    && prev_line.count_glyphes() < 20
+                                {
+                                    lines_to_remove.push(i as u32 - 1);
+                                    let _ = y_top.insert(prev_line.get_top());
+                                }
+                            }
                         }
-                    }
-                }
 
-                if next_line_some.is_some() {
-                    let next_line = next_line_some.unwrap();
-                    if let Some(line_margin) = next_line.get_left_margin() {
-                        if (line_margin as i32 - margins.0 as i32).abs() > 10
-                            && next_line.count_glyphes() < 20
-                        {
-                            let _ = y_bottom.insert(next_line.get_bottom());
+                        if next_line_some.is_some() {
+                            let next_line = next_line_some.unwrap();
+                            if let Some(line_margin) = next_line.get_left_margin() {
+                                if i + 2 != self.lines.len()
+                                    && (line_margin as i32 - margins.0 as i32).abs() > 10
+                                    && next_line.count_glyphes() < 20
+                                {
+                                    lines_to_remove.push(i as u32 + 1);
+                                    let _ = y_bottom.insert(next_line.get_bottom());
+                                }
+                            }
                         }
-                    }
-                }
-                for words_index in searched_words {
-                    if let (Some(Some(top)), Some(Some(bottom))) = (y_top, y_bottom) {
-                        let current_line = self.lines.get_mut(i).unwrap();
-                        let word = current_line.words.get_mut(words_index);
-                        if word.is_none() {
-                            continue;
+                        if let (Some(Some(top)), Some(Some(bottom))) = (y_top, y_bottom) {
+                            let rect = Rect::new(
+                                current_line.rect.x,
+                                top,
+                                current_line.rect.width,
+                                bottom - top,
+                            );
+                            let extracted_image = rect.crop(&self.image);
+                            let latex = Model::predict(&extracted_image)?;
+                            extracted_image.save(format!("test{}.png", top))?;
+                            let current_line = self.lines.get_mut(i).unwrap();
+                            current_line.words.clear();
+                            current_line.words.push(Word::from(rect, &self.image));
+                            let _ = current_line.words.first_mut().unwrap().latex.insert(latex);
                         }
-                        let word = word.unwrap();
-                        let rect = Rect::new(
-                            word.rect.x + word.rect.width,
-                            top,
-                            current_line.rect.width - word.rect.x,
-                            bottom - top,
-                        );
-                        let extracted_image = rect.crop(&self.image);
-                        let latex = Model::predict(&extracted_image)?;
-                        extracted_image.save(format!("test{}.png", top))?;
-                        let _ = word.latex.insert("= ".to_owned() + &latex + "$");
-                        current_line.pop_words_in_rect(&rect);
-                        self.lines
-                            .get_mut(i - 1)
-                            .map(|line| line.pop_words_in_rect(&rect));
-                        self.lines
-                            .get_mut(i + 1)
-                            .map(|line| line.pop_words_in_rect(&rect));
                     }
                 }
             }
         }
 
+        lines_to_remove.reverse();
+        for index in lines_to_remove {
+            self.lines.remove(index as usize);
+        }
+
+        // remove page number
         if self.lines.last().is_some_and(|line| {
             line.words.len() == 1
                 && line.words[0].glyphs.len() == 1
