@@ -243,7 +243,9 @@ impl Page {
                 current_line.get_right_margin(),
             );
 
-            if !current_line.is_full_line(margins) {
+            if current_line.get_dist_sum() / (current_line.count_glyphes() as f32) > 10.
+                && !current_line.is_full_line(margins)
+            {
                 if let (Some(left_margin), Some(right_margin)) = line_margin {
                     if margins.1 - right_margin < left_margin - margins.0 + 25 {
                         let (prev_line_some, next_line_some) =
@@ -277,7 +279,7 @@ impl Page {
                         }
                         if let (Some(Some(top)), Some(Some(bottom))) = (y_top, y_bottom) {
                             let rect = Rect::new(
-                                current_line.rect.x,
+                                current_line.get_left_margin().unwrap_or(0),
                                 top,
                                 current_line.rect.width,
                                 bottom - top,
@@ -301,14 +303,7 @@ impl Page {
         }
 
         // remove page number
-        if self.lines.last().is_some_and(|line| {
-            line.words.len() == 1
-                && line.words[0].glyphs.len() == 1
-                && line.words[0].glyphs[0]
-                    .guess
-                    .clone()
-                    .is_some_and(|guess| guess.base.parse::<i32>().is_ok())
-        }) {
+        if self.lines.last().is_some_and(|line| line.words.len() == 1) {
             self.lines.remove(self.lines.len() - 1);
         }
 

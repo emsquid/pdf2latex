@@ -1,7 +1,6 @@
 use super::Word;
 use crate::fonts::FontBase;
 use crate::fonts::KnownGlyph;
-use crate::fonts::DIST_THRESHOLD;
 use crate::utils::{find_parts, most_frequent, Rect};
 use image::DynamicImage;
 
@@ -188,8 +187,8 @@ impl Line {
 
     pub fn is_full_line(&self, page_margins: (u32, u32)) -> bool {
         if let (Some(left_margin), Some(right_margin)) = self.get_margins() {
-            return (left_margin as i32 - page_margins.0 as i32).abs() < 15
-                && (right_margin as i32 - page_margins.1 as i32).abs() < 15;
+            return (left_margin as i32 - page_margins.0 as i32).abs() < 50
+                && (right_margin as i32 - page_margins.1 as i32).abs() < 50;
         }
         return false;
     }

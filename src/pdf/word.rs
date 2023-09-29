@@ -151,21 +151,22 @@ impl Word {
     /// Get the LaTeX for a Word
     #[must_use]
     pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
-        if let Some(l) = &self.latex {
-            return l.to_owned();
-        }
-        self.glyphs
-            .iter()
-            .enumerate()
-            .map(|(i, glyph)| {
-                let prev = self.glyphs.get(i - 1).map_or(prev, |g| &g.guess);
-                let next = self.glyphs.get(i + 1).map_or(next, |g| &g.guess);
+        if let Some(latex) = &self.latex {
+            format!("$${latex}$$")
+        } else {
+            self.glyphs
+                .iter()
+                .enumerate()
+                .map(|(i, glyph)| {
+                    let prev = self.glyphs.get(i - 1).map_or(prev, |g| &g.guess);
+                    let next = self.glyphs.get(i + 1).map_or(next, |g| &g.guess);
 
-                glyph.guess.clone().map_or(String::from("?"), |g| {
-                    g.get_latex(prev, next, i == self.glyphs.len() - 1)
+                    glyph.guess.clone().map_or(String::from("?"), |g| {
+                        g.get_latex(prev, next, i == self.glyphs.len() - 1)
+                    })
                 })
-            })
-            .collect()
+                .collect()
+        }
     }
 
     /// Compute the sum of the distance of each Glyph in the Word
