@@ -202,6 +202,30 @@ impl FontBase {
                 (chr.to_uppercase().to_string(), Style::text(), vec![], false),
                 (chr.to_lowercase().to_string(), Style::basic(), vec![], true),
                 (chr.to_uppercase().to_string(), Style::basic(), vec![], true),
+                (
+                    format!("^{}", chr.to_lowercase()),
+                    Style::basic(),
+                    vec![],
+                    true,
+                ),
+                (
+                    format!("_{}", chr.to_lowercase()),
+                    Style::basic(),
+                    vec![],
+                    true,
+                ),
+                (
+                    format!("^{}", chr.to_uppercase()),
+                    Style::basic(),
+                    vec![],
+                    true,
+                ),
+                (
+                    format!("_{}", chr.to_uppercase()),
+                    Style::basic(),
+                    vec![],
+                    true,
+                ),
             ]);
         }
 
