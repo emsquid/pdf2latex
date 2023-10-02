@@ -6,6 +6,7 @@ use crate::utils::{find_parts, log, most_frequent, Rect};
 use crate::vit::Model;
 use anyhow::Result;
 use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
+use std::sync::{Arc, Mutex};
 use std::{io::Write, time};
 
 const LINE_SPACING: u32 = 10;
@@ -210,101 +211,190 @@ impl Page {
     }
 
     /// Clean the pdf, like removing trailing dashes
-    pub fn clean(&mut self) -> Result<()> {
-        let margins = (self.get_left_margin_mode(), self.get_right_margin_mode());
-        let mut lines_to_remove: Vec<u32> = Vec::new();
-        std::io::stdout().write_all(b"Cleaning the pdf (generating formulas, ...)")?;
-        std::io::stdout().flush()?;
+    pub fn clean(&mut self, args: &MainArg) -> Result<()> {
         for i in 0..self.lines.len() {
-            let current_line = self.lines.get_mut(i).unwrap();
-            let last_word = current_line.words.last();
-            let last_char = last_word.map(|word| word.get_content().chars().last());
-            if last_char == Some(Some('-')) {
-                // TODO remove trailing dash from image
-                // TODO FIX : image is not in place so newline is inserted add values to avoid this
-                current_line.words.last_mut().unwrap().glyphs.pop();
-                current_line.can_have_new_line = false;
-                let mut next_line = self.lines.get_mut(i + 1);
-                if next_line
-                    .as_ref()
-                    .is_some_and(|line| line.words.first().is_some())
-                {
-                    let word = next_line.as_mut().unwrap().words.remove(0);
-                    // TODO more than just add items
-                    let current_line = self.lines.get_mut(i).unwrap();
-                    let last_word = current_line.words.last_mut().unwrap();
-                    last_word.glyphs.extend(word.glyphs);
-                }
-            }
+            self.handle_trailing_dash_clean(i);
+        }
 
-            let current_line = self.lines.get(i).unwrap();
-            let line_margin = (
-                current_line.get_left_margin(),
-                current_line.get_right_margin(),
-            );
+        self.handle_formulas_clean(args)?;
 
-            if current_line.get_dist_sum() / (current_line.count_glyphes() as f32) > 10.
-                && !current_line.is_full_line(margins)
+        // remove page number
+        if self.lines.last().is_some_and(|line| line.words.len() == 1) {
+            self.lines.remove(self.lines.len() - 1);
+        }
+
+        Ok(())
+    }
+
+    pub fn handle_trailing_dash_clean(&mut self, line_index: usize) {
+        let current_line = self.lines.get_mut(line_index).unwrap();
+        let last_word = current_line.words.last();
+        let last_char = last_word.map(|word| word.get_content().chars().last());
+        if last_char == Some(Some('-')) {
+            // TODO remove trailing dash from image
+            // TODO FIX : image is not in place so newline is inserted add values to avoid this
+            current_line.words.last_mut().unwrap().glyphs.pop();
+            current_line.can_have_new_line = false;
+            drop(current_line);
+            let mut next_line = self.lines.get_mut(line_index + 1);
+            if next_line
+                .as_ref()
+                .is_some_and(|line| line.words.first().is_some())
             {
-                if let (Some(left_margin), Some(right_margin)) = line_margin {
-                    if margins.1 - right_margin < left_margin - margins.0 + 25 {
-                        let (prev_line_some, next_line_some) =
-                            (self.lines.get(i - 1), self.lines.get(i + 1));
-                        let mut y_top = prev_line_some.map(Line::get_bottom);
-                        let mut y_bottom = next_line_some.map(Line::get_top);
+                let word = next_line.as_mut().unwrap().words.remove(0);
+                // TODO more than just add items
+                let current_line = self.lines.get_mut(line_index).unwrap();
+                let last_word = current_line.words.last_mut().unwrap();
+                last_word.glyphs.extend(word.glyphs);
+            }
+        }
+    }
 
-                        if self.lines.get(i - 1).is_some() {
-                            let prev_line = prev_line_some.unwrap();
-                            if let Some(line_margin) = prev_line.get_left_margin() {
-                                if (line_margin as i32 - margins.0 as i32).abs() > 10
-                                    && prev_line.count_glyphes() < 20
-                                {
-                                    lines_to_remove.push(i as u32 - 1);
-                                    let _ = y_top.insert(prev_line.get_top());
-                                }
+    pub fn handle_formulas_clean(&mut self, args: &MainArg) -> Result<()> {
+        let formula_indexes = self.get_middle_formula_indexes();
+        let nb_formula = &formula_indexes.len().to_owned();
+        let mut formula_id = 0;
+        let formula_done = Arc::new(Mutex::new(0));
+
+        let image_page = &self.image.to_owned();
+        let margins = (self.get_left_margin_mode(), self.get_right_margin_mode());
+
+        let mut lines_to_remove: Vec<u32> = Vec::new();
+        let lines_to_modify: Arc<Mutex<Vec<(usize, Word)>>> = Arc::new(Mutex::new(Vec::new()));
+
+        if args.verbose {
+            log("\nGENERATING FORMULAS\n", None, None, "1m")?;
+            log(
+                format!("Generating Formulas ... 0/{}", nb_formula).as_str(),
+                None,
+                None,
+                "u",
+            )?;
+        }
+        let now = time::Instant::now();
+
+        std::thread::scope(|scope| -> Result<()> {
+            let mut handles = Vec::with_capacity(args.threads);
+
+            for i in formula_indexes {
+                // println!("handling {}", i);
+                let current_line = self.lines.get(i).unwrap();
+                let line_margin = (
+                    current_line.get_left_margin(),
+                    current_line.get_right_margin(),
+                );
+
+                if line_margin.1.is_some() && line_margin.0.is_some() {
+                    // println!("passed => {}", i);
+                    let (prev_line_some, next_line_some) =
+                        (self.lines.get(i - 1), self.lines.get(i + 1));
+                    let mut y_top = prev_line_some.map(Line::get_bottom);
+                    let mut y_bottom = next_line_some.map(Line::get_top);
+
+                    if prev_line_some.is_some() {
+                        let prev_line = prev_line_some.unwrap();
+                        if let Some(line_margin) = prev_line.get_left_margin() {
+                            if (line_margin as i32 - margins.0 as i32).abs() > 10
+                                && prev_line.count_glyphes() < 20
+                            {
+                                lines_to_remove.push(i as u32 - 1);
+                                let _ = y_top.insert(prev_line.get_top());
                             }
                         }
+                    }
 
-                        if next_line_some.is_some() {
-                            let next_line = next_line_some.unwrap();
-                            if let Some(line_margin) = next_line.get_left_margin() {
-                                if i + 2 != self.lines.len()
-                                    && (line_margin as i32 - margins.0 as i32).abs() > 10
-                                    && next_line.count_glyphes() < 20
-                                {
-                                    lines_to_remove.push(i as u32 + 1);
-                                    let _ = y_bottom.insert(next_line.get_bottom());
-                                }
+                    if next_line_some.is_some() {
+                        let next_line = next_line_some.unwrap();
+                        if let Some(line_margin) = next_line.get_left_margin() {
+                            if i + 2 != self.lines.len()
+                                && (line_margin as i32 - margins.0 as i32).abs() > 10
+                                && next_line.count_glyphes() < 20
+                            {
+                                lines_to_remove.push(i as u32 + 1);
+                                let _ = y_bottom.insert(next_line.get_bottom());
                             }
                         }
-                        if let (Some(Some(top)), Some(Some(bottom))) = (y_top, y_bottom) {
+                    }
+                    if let (Some(Some(top)), Some(Some(bottom))) = (y_top, y_bottom) {
+                        let current_left_margin = current_line.get_left_margin().unwrap_or(0);
+                        let current_line_width = current_line.rect.width;
+
+                        let lines_to_modify_cloned = lines_to_modify.clone();
+                        let count_cloned = formula_id.to_owned();
+                        let formula_done_cloned = formula_done.clone();
+                        // println!("strating thread => {}", i);
+
+                        let handle = scope.spawn(move || -> Result<()> {
                             let rect = Rect::new(
-                                current_line.get_left_margin().unwrap_or(0),
+                                current_left_margin,
                                 top,
-                                current_line.rect.width,
+                                current_line_width,
                                 bottom - top,
                             );
-                            let extracted_image = rect.crop(&self.image);
-                            let latex = Model::predict(&extracted_image)?;
+                            let extracted_image = rect.crop(&image_page);
+                            let latex = Model::predict(&extracted_image, Some(count_cloned))?;
+                            {
+                                *formula_done_cloned.lock().unwrap() += 1;
+                            }
+                            if args.verbose {
+                                log(
+                                    format!(
+                                        "Generating Formulas ... {}/{}",
+                                        formula_done_cloned.lock().unwrap(),
+                                        nb_formula
+                                    )
+                                    .as_str(),
+                                    None,
+                                    None,
+                                    "u",
+                                )?;
+                            }
                             extracted_image.save(format!("test{}.png", top))?;
-                            let current_line = self.lines.get_mut(i).unwrap();
-                            current_line.words.clear();
-                            current_line.words.push(Word::from(rect, &self.image));
-                            let _ = current_line.words.first_mut().unwrap().latex.insert(latex);
+                            let mut word = Word::from(rect, &image_page);
+                            let _ = word.latex.insert(latex);
+                            lines_to_modify_cloned.lock().unwrap().push((i, word));
+                            Ok(())
+                        });
+                        formula_id += 1;
+
+                        handles.push(handle);
+                        if handles.len() >= 2 {
+                            // if handles.len() >= args.threads {
+                            handles.remove(0).join().unwrap().unwrap();
                         }
                     }
                 }
             }
+            for handle in handles {
+                handle.join().unwrap().unwrap();
+            }
+            Ok(())
+        })?;
+
+        if args.verbose {
+            log(
+                format!("Generating Formulas ... {}/{}", nb_formula, nb_formula).as_str(),
+                None,
+                None,
+                "u",
+            )?;
+            let duration = now.elapsed().as_secs_f32();
+            std::io::stdout().write(&[10])?;
+            log("GENERATED FORMULAS", None, Some(duration), "1m")?;
+            std::io::stdout().write(&[10, 10])?;
+            std::io::stdout().flush()?;
+        }
+
+        let len = lines_to_modify.lock().unwrap().len();
+        for (line_index, word) in lines_to_modify.lock().unwrap().iter().take(len) {
+            let line = self.lines.get_mut(*line_index).unwrap();
+            line.words.clear();
+            line.words.push(word.to_owned());
         }
 
         lines_to_remove.reverse();
         for index in lines_to_remove {
             self.lines.remove(index as usize);
-        }
-
-        // remove page number
-        if self.lines.last().is_some_and(|line| line.words.len() == 1) {
-            self.lines.remove(self.lines.len() - 1);
         }
 
         Ok(())
@@ -334,5 +424,22 @@ impl Page {
             .enumerate()
             .map(|(i, line)| (i, line.search_words(pattern)))
             .collect()
+    }
+
+    pub fn get_middle_formula_indexes(&self) -> Vec<usize> {
+        let mut lines_vec = Vec::new();
+        let margins = (self.get_left_margin_mode(), self.get_right_margin_mode());
+        for (i, line) in self.lines.iter().enumerate() {
+            let line_margin = (line.get_left_margin(), line.get_right_margin());
+            if let (Some(left_margin), Some(right_margin)) = line_margin {
+                if margins.1 - right_margin < left_margin - margins.0 + 25
+                    && line.get_dist_sum() / (line.count_glyphes() as f32) > 10.
+                    && !line.is_full_line(margins)
+                {
+                    lines_vec.push(i);
+                }
+            }
+        }
+        return lines_vec;
     }
 }

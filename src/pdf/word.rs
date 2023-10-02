@@ -8,6 +8,7 @@ use image::DynamicImage;
 const WORD_SPACING: u32 = 15;
 
 /// A word from a Line from a Page from a Pdf
+#[derive(Clone)]
 pub struct Word {
     pub rect: Rect,
     pub glyphs: Vec<UnknownGlyph>,
