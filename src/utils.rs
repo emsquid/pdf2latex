@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use image::{DynamicImage, GrayImage};
+use regex::Regex;
 use std::cmp::Ordering;
 use std::io::Write;
 use std::path::Path;
@@ -76,13 +77,46 @@ fn buffer_to_ppm(buffer: &[u8]) -> Result<Vec<DynamicImage>> {
 ///
 /// # Errors
 /// Fails if the command pdftoppm is not executed correcly
-pub fn pdf_to_images(path: &Path) -> Result<Vec<DynamicImage>> {
-    let output = Command::new("pdftoppm")
-        .args(["-r", "512", &path.to_string_lossy()])
-        .output()?;
+pub fn pdf_to_images(path: &Path, pages_number: Option<&[usize]>) -> Result<Vec<DynamicImage>> {
+    if let Some(numbers) = pages_number {
+        let mut dynamic_images = Vec::with_capacity(numbers.len());
+        for i in numbers {
+            let output = Command::new("pdftoppm")
+                .args(["-r", "512", &path.to_string_lossy(), "-f", &i.to_string()])
+                .output()?;
+            dynamic_images.extend_from_slice(&match output.stderr.len() {
+                0 => buffer_to_ppm(&output.stdout),
+                _ => Err(anyhow!("Format error: This is not a PDF")),
+            }?);
+        }
+        Ok(dynamic_images)
+    } else {
+        let output = Command::new("pdftoppm")
+            .args(["-r", "512", &path.to_string_lossy()])
+            .output()?;
+        match output.stderr.len() {
+            0 => buffer_to_ppm(&output.stdout),
+            _ => Err(anyhow!("Format error: This is not a PDF")),
+        }
+    }
+}
+
+pub fn pdf_pages_number(path: &Path) -> Result<usize> {
+    let output = Command::new("pdfinfo").arg(path.to_path_buf()).output()?;
     match output.stderr.len() {
-        0 => buffer_to_ppm(&output.stdout),
-        _ => Err(anyhow!("Format error: This is not a PDF")),
+        0 => {
+            let reg = Regex::new(r"(?m)^Pages:(\ *)([0-9]+)(\ *)$")?;
+            let s = String::from_utf8(output.stdout)?;
+            Ok(reg
+                .captures(&s)
+                .unwrap()
+                .get(2)
+                .unwrap()
+                .as_str()
+                .trim()
+                .parse()?)
+        }
+        _ => Err(anyhow!("Format error: could not get the number of pages")),
     }
 }
 

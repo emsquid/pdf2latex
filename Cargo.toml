@@ -13,3 +13,4 @@ bitcode = "0.4.0"
 clap = { version = "4.3.5", features = ["derive"] }
 dirs = "5.0.1"
 image = "0.24.6"
+regex = "1.10.0"

@@ -7,8 +7,9 @@ use pdf2latex::pdf::Pdf;
 /// Process the arguments given by the user
 fn process(args: &MainArg) -> Result<()> {
     // Load the pdf
-    let mut pdf = Pdf::load(&args.input)?;
+    // let mut pdf = Pdf::load(&args.input)?;
 
+    let mut pdf = Pdf::default();
     // Guess its content and either save it or print it
     pdf.guess(&args)?;
     match &args.output {

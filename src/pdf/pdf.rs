@@ -1,35 +1,37 @@
 use super::Page;
 use crate::args::MainArg;
 use crate::fonts::FontBase;
-use crate::utils::{log, pdf_to_images};
+use crate::utils::{log, pdf_pages_number, pdf_to_images};
 use anyhow::Result;
-use std::{io::Write, path::Path};
+use std::io::Write;
 
 /// A Pdf document represented as multiple pages
+#[derive(Default)]
 pub struct Pdf {
     pub pages: Vec<Page>,
 }
 
 impl Pdf {
     /// Load a Pdf from the given path
-    ///
-    /// # Errors
-    /// Fails if cannot convert the PDF into an image
-    pub fn load(path: &Path) -> Result<Pdf> {
-        let pages = pdf_to_images(path)?.iter().map(Page::from).collect();
-
-        Ok(Pdf { pages })
-    }
-
     /// Guess the content of a Pdf
     ///
     /// # Errors
+    /// Fails if cannot convert the PDF into an image
     /// Fails if cannot write into stdout or log
     pub fn guess(&mut self, args: &MainArg) -> Result<()> {
         // The FontBase is needed to compare glyphs
         let fontbase = FontBase::try_from(args)?;
+        let nb_pages = pdf_pages_number(&args.input)?;
+        self.pages = Vec::with_capacity(nb_pages);
 
-        for (i, page) in self.pages.iter_mut().enumerate() {
+        for i in 0..nb_pages {
+            self.pages.push(
+                pdf_to_images(&args.input, Some(&[i + 1]))?
+                    .get(0)
+                    .map(Page::from)
+                    .unwrap(),
+            );
+            let page = self.pages.get_mut(i).unwrap();
             if args.verbose {
                 log(&format!("\nPAGE {i}\n"), None, None, "1m")?;
             }
