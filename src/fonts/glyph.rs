@@ -49,7 +49,7 @@ pub trait Glyph {
     /// Compute the distance between two glyphs with the given offset
     fn distance(&self, other: &dyn Glyph, offset: i32, limit: f32) -> f32 {
         // The distance is computed considering an error offset of 1
-        let mut dist = HashMap::new();
+        let mut dist = HashMap::with_capacity(9);
         for dx in -1..=1 {
             for dy in -1..=1 {
                 dist.insert((dx, dy + offset), 0.);
@@ -436,7 +436,6 @@ impl UnknownGlyph {
 
                             if dist < closest {
                                 closest = dist;
-                                let _ = self.dist.insert(dist);
                                 let _ = current_guess.insert(glyph);
                             }
 
@@ -448,6 +447,7 @@ impl UnknownGlyph {
                 }
             }
         }
+        let _ = self.dist.insert(closest);
         self.guess = current_guess.cloned();
     }
 }

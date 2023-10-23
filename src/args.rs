@@ -20,6 +20,10 @@ pub struct MainArg {
     /// Verbose mode
     #[arg(short, long, default_value_t = false)]
     pub verbose: bool,
+
+    /// Parse only selected pages, examples: 1,3,5,7-9,11,20,23-63
+    #[arg(short, long)]
+    pub pages: Option<String>,
 }
 
 /// Arguments the user can give when using pdf2latex to generate `FontBases`

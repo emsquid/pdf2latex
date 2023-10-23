@@ -1,8 +1,9 @@
 use super::Page;
+ use memuse::DynamicUsage;
 use crate::args::MainArg;
 use crate::fonts::FontBase;
 use crate::utils::{log, pdf_pages_number, pdf_to_images};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::io::Write;
 
 /// A Pdf document represented as multiple pages
@@ -19,12 +20,38 @@ impl Pdf {
     /// Fails if cannot convert the PDF into an image
     /// Fails if cannot write into stdout or log
     pub fn guess(&mut self, args: &MainArg) -> Result<()> {
+        let mut indexes: Vec<usize> = Vec::new();
+        let nb_pages = pdf_pages_number(&args.input)?;
+        if let Some(pages_number) = &args.pages {
+            pages_number.split(",").for_each(|s| {
+                let a = s
+                    .split("-")
+                    .map(|v| v.trim().parse::<usize>().unwrap())
+                    .collect::<Vec<usize>>();
+                indexes.extend_from_slice(&match a.len() {
+                    1 => a,
+                    2 => (a[0]..=a[1]).collect(),
+                    _ => panic!("error"),
+                });
+            });
+            indexes.sort();
+            indexes.dedup();
+            if indexes
+                .last()
+                .is_some_and(|page_number| page_number > &nb_pages)
+            {
+                return Err(anyhow!("Error page number: you provided the {} page however the PDF contains {nb_pages} pages", indexes.last().unwrap()));
+            }
+        } else {
+            indexes.extend_from_slice(&(0..nb_pages).collect::<Vec<usize>>());
+        }
+
         // The FontBase is needed to compare glyphs
         let fontbase = FontBase::try_from(args)?;
-        let nb_pages = pdf_pages_number(&args.input)?;
-        self.pages = Vec::with_capacity(nb_pages);
+        // println!("{:?}", fontbase.glyphs);
+        self.pages = Vec::with_capacity(indexes.len());
 
-        for i in 0..nb_pages {
+        for i in indexes {
             self.pages.push(
                 pdf_to_images(&args.input, Some(&[i + 1]))?
                     .get(0)
