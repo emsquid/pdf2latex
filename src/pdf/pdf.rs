@@ -1,5 +1,4 @@
 use super::Page;
- use memuse::DynamicUsage;
 use crate::args::MainArg;
 use crate::fonts::FontBase;
 use crate::utils::{log, pdf_pages_number, pdf_to_images};
@@ -48,24 +47,23 @@ impl Pdf {
 
         // The FontBase is needed to compare glyphs
         let fontbase = FontBase::try_from(args)?;
-        // println!("{:?}", fontbase.glyphs);
         self.pages = Vec::with_capacity(indexes.len());
 
         for i in indexes {
             self.pages.push(
-                pdf_to_images(&args.input, Some(&[i + 1]))?
+                pdf_to_images(&args.input, Some(&[i]))?
                     .get(0)
                     .map(Page::from)
                     .unwrap(),
             );
-            let page = self.pages.get_mut(i).unwrap();
+            let page = self.pages.last_mut().unwrap();
             if args.verbose {
                 log(&format!("\nPAGE {i}\n"), None, None, "1m")?;
             }
 
             page.guess(&fontbase, args)?;
         }
-        self.clean(args)?;
+        self.verify(args)?;
 
         if args.verbose {
             std::io::stdout().write_all(b"\n")?;
@@ -110,9 +108,9 @@ impl Pdf {
         self.pages.iter().map(Page::get_latex).collect()
     }
 
-    pub fn clean(&mut self, args: &MainArg) -> Result<()> {
+    pub fn verify(&mut self, args: &MainArg) -> Result<()> {
         for page in self.pages.iter_mut() {
-            page.clean(args)?;
+            page.verify(args)?;
         }
         Ok(())
     }

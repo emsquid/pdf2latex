@@ -7,8 +7,18 @@ use std::path::Path;
 use std::process::Command;
 use std::{collections::HashMap, hash::Hash};
 
+#[derive(Debug, Clone)]
+pub enum BracketType {
+    OpeningRound,  // (
+    ClosingRound,  // )
+    OpeningSquare, // [
+    ClosingSquare, // ]
+    OpeningCurly,  // {
+    ClosingCurly,  // }
+}
+
 /// A Rectangle in 2D
-#[derive(Clone, Copy, Debug, bitcode::Encode, bitcode::Decode)]
+#[derive(Clone, Copy, Debug, bitcode::Encode, bitcode::Decode, Default)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,

@@ -1,3 +1,4 @@
+use crate::fonts::glyph::SpecialFormulas;
 use crate::fonts::FontBase;
 use crate::fonts::{Glyph, KnownGlyph, UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD};
 use crate::utils::Rect;
@@ -12,7 +13,7 @@ const WORD_SPACING: u32 = 15;
 pub struct Word {
     pub rect: Rect,
     pub glyphs: Vec<UnknownGlyph>,
-    pub latex: Option<String>,
+    pub special_formula: Option<SpecialFormulas>,
 }
 
 impl Word {
@@ -21,7 +22,7 @@ impl Word {
         Word {
             rect,
             glyphs: Word::find_glyphs(rect, image),
-            latex: None,
+            special_formula: None,
         }
     }
 
@@ -117,10 +118,10 @@ impl Word {
 
     /// Get the guess for the first glyph in a Word
     #[must_use]
-    pub fn get_first_guess(&self) -> Option<KnownGlyph> {
+    pub fn get_first_guess(&self) -> Option<&KnownGlyph> {
         // TODO: Temporary fix
         if self.get_dist_sum() / (self.glyphs.len() as f32) < DIST_THRESHOLD * 4.0 {
-            self.glyphs.first().and_then(|glyph| glyph.guess.clone())
+            self.glyphs.first().and_then(|glyph| glyph.guess.as_ref())
         } else {
             None
         }
@@ -128,10 +129,10 @@ impl Word {
 
     /// Get the guess for the last glyph in a Word
     #[must_use]
-    pub fn get_last_guess(&self) -> Option<KnownGlyph> {
+    pub fn get_last_guess(&self) -> Option<&KnownGlyph> {
         // TODO: Temporary fix
         if self.get_dist_sum() / (self.glyphs.len() as f32) < DIST_THRESHOLD * 4.0 {
-            self.glyphs.last().and_then(|glyph| glyph.guess.clone())
+            self.glyphs.last().and_then(|glyph| glyph.guess.as_ref())
         } else {
             None
         }
@@ -151,18 +152,18 @@ impl Word {
 
     /// Get the LaTeX for a Word
     #[must_use]
-    pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
-        if let Some(latex) = &self.latex {
-            format!("$${latex}$$")
+    pub fn get_latex(&self, prev: Option<&KnownGlyph>, next: Option<&KnownGlyph>) -> String {
+        if let Some(special_formulas) = &self.special_formula {
+            format!("$${}$$", special_formulas.get_latex())
         } else {
             self.glyphs
                 .iter()
                 .enumerate()
                 .map(|(i, glyph)| {
-                    let prev = self.glyphs.get(i - 1).map_or(prev, |g| &g.guess);
-                    let next = self.glyphs.get(i + 1).map_or(next, |g| &g.guess);
+                    let prev = self.glyphs.get(i - 1).map_or(prev, |g| g.guess.as_ref());
+                    let next = self.glyphs.get(i + 1).map_or(next, |g| g.guess.as_ref());
 
-                    glyph.guess.clone().map_or(String::from("?"), |g| {
+                    glyph.guess.as_ref().map_or(String::from("?"), |g| {
                         g.get_latex(prev, next, i == self.glyphs.len() - 1)
                     })
                 })

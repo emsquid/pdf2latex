@@ -1,13 +1,16 @@
 use crate::args::MainArg;
-use crate::fonts::glyph::Glyph;
-use crate::fonts::FontBase;
+use crate::fonts::glyph::SpecialFormulas;
+use crate::fonts::{glyph::Glyph, FontBase};
 use crate::pdf::{Line, Word};
 use crate::utils::{find_parts, log, most_frequent, Rect};
 use crate::vit::Model;
 use anyhow::Result;
 use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
-use std::sync::{Arc, Mutex};
-use std::{io::Write, time};
+use std::{
+    io::Write,
+    sync::{Arc, Mutex},
+    time,
+};
 
 const LINE_SPACING: u32 = 10;
 
@@ -55,7 +58,7 @@ impl Page {
             }
 
             // Handles to store threads
-            let mut handles = Vec::new();
+            let mut handles = Vec::with_capacity(args.threads);
             for line in &mut self.lines {
                 // Use a thread to guess the content of several lines concurrently
                 let handle = scope.spawn(move || line.guess(fontbase));
@@ -122,7 +125,11 @@ impl Page {
                 } else {
                     ""
                 };
-                format!("\n    {}{}", line.get_latex(&prev, &next,), newline)
+                format!(
+                    "\n    {}{}",
+                    line.get_latex(prev.as_ref(), next.as_ref(),),
+                    newline
+                )
             })
             .collect()
     }
@@ -211,12 +218,11 @@ impl Page {
     }
 
     /// Clean the pdf, like removing trailing dashes
-    pub fn clean(&mut self, args: &MainArg) -> Result<()> {
+    pub fn verify(&mut self, args: &MainArg) -> Result<()> {
         for i in 0..self.lines.len() {
-            self.handle_trailing_dash_clean(i);
+            self.handle_trailing_dash_verify(i);
         }
-
-        self.handle_formulas_clean(args)?;
+        self.handle_formulas_verify(args)?;
 
         // remove page number
         if self.lines.last().is_some_and(|line| line.words.len() == 1) {
@@ -226,7 +232,11 @@ impl Page {
         Ok(())
     }
 
-    pub fn handle_trailing_dash_clean(&mut self, line_index: usize) {
+    pub fn handle_matrix_verify(&mut self) {
+
+    }
+
+    pub fn handle_trailing_dash_verify(&mut self, line_index: usize) {
         let current_line = self.lines.get_mut(line_index).unwrap();
         let last_word = current_line.words.last();
         let last_char = last_word.map(|word| word.get_content().chars().last());
@@ -250,8 +260,11 @@ impl Page {
         }
     }
 
-    pub fn handle_formulas_clean(&mut self, args: &MainArg) -> Result<()> {
+    pub fn handle_formulas_verify(&mut self, args: &MainArg) -> Result<()> {
         let formula_indexes = self.get_middle_formula_indexes();
+        if formula_indexes.len() == 00 {
+            return Ok(());
+        }
         let nb_formula = &formula_indexes.len().to_owned();
         let mut formula_id = 0;
         let formula_done = Arc::new(Mutex::new(0));
@@ -351,7 +364,9 @@ impl Page {
                             }
                             extracted_image.save(format!("test{}.png", top))?;
                             let mut word = Word::from(rect, &image_page);
-                            let _ = word.latex.insert(latex);
+                            let _ = word
+                                .special_formula
+                                .insert(SpecialFormulas::GivenIaFormula(latex));
                             lines_to_modify_cloned.lock().unwrap().push((i, word));
                             Ok(())
                         });

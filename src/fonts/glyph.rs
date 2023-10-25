@@ -1,6 +1,6 @@
 use super::{code::Code, size::Size, style::Style};
 use crate::fonts::FontBase;
-use crate::utils::{find_parts, flood_fill, Rect};
+use crate::utils::{find_parts, flood_fill, BracketType, Rect};
 use anyhow::{anyhow, Result};
 use image::{DynamicImage, GenericImageView, GrayImage, Pixel, Rgb, RgbImage};
 use std::{collections::HashMap, process::Command};
@@ -8,6 +8,35 @@ use std::{collections::HashMap, process::Command};
 pub const DIST_UNALIGNED_THRESHOLD: f32 = 32.;
 pub const DIST_THRESHOLD: f32 = 4.;
 pub const CHAR_THRESHOLD: u8 = 75;
+
+#[derive(Clone)]
+pub struct Matrix {
+    nb_col: u32,
+    nb_line: u32,
+    values: Vec<u32>,
+    bracket_type: BracketType,
+}
+
+impl Matrix {
+    pub fn get_latex(&self) -> String {
+        return "".to_string();
+    }
+}
+
+#[derive(Clone)]
+pub enum SpecialFormulas {
+    Matrix(Matrix),
+    GivenIaFormula(String),
+}
+
+impl SpecialFormulas {
+    pub fn get_latex(&self) -> String {
+        match self {
+            SpecialFormulas::Matrix(m) => m.get_latex(),
+            SpecialFormulas::GivenIaFormula(gia) => gia.to_owned(),
+        }
+    }
+}
 
 /// A Glyph represents the image for a character
 pub trait Glyph {
@@ -103,6 +132,183 @@ pub trait Glyph {
             image::ImageFormat::Png,
         )?)
     }
+
+    fn get_bracket_type(&self) -> Result<Option<BracketType>> {
+        if self.rect().width * 2 > self.rect().height {
+            return Ok(None);
+        }
+        let img = &self.image();
+        let right_top_corner_s = img.get((self.rect().width - 1) as usize);
+        let left_bottom_corner_s = img.get(
+            (img.len()
+                .saturating_add_signed(-(self.rect().width as isize))) as usize,
+        );
+        if let (
+            Some(left_top_corner),
+            Some(right_top_corner),
+            Some(right_bottom_corner),
+            Some(left_bottom_corner),
+        ) = (
+            img.first(),
+            right_top_corner_s,
+            img.last(),
+            left_bottom_corner_s,
+        ) {
+            const DIFF: u32 = 5;
+            //  detect ) / } / ]
+            let middle_index_left = ((self.rect().height / 2) * self.rect().width) as usize;
+            let middle_index_right =
+                ((((self.rect().height / 2) + 1) * self.rect().width) - 1) as usize;
+            if left_top_corner != &255
+                && left_bottom_corner != &255
+                && img.get(middle_index_right).is_some_and(|v| v != &255)
+            {
+                let lower_index =
+                    (((self.rect().height / 2 - DIFF) * self.rect().width) - 1) as usize;
+                let upper_index =
+                    (((self.rect().height / 2 + DIFF) * self.rect().width) - 1) as usize;
+                if let (Some(lower_middle), Some(upper_middle)) =
+                    (img.get(lower_index), img.get(upper_index))
+                {
+                    // by default => }
+                    let mut typ: BracketType = BracketType::ClosingCurly;
+                    // diff ) / ]
+                    if lower_middle != &255 && upper_middle != &255 {
+                        // ]
+                        if right_top_corner != &255 && right_bottom_corner != &255 {
+                            println!("found ]");
+                            typ = BracketType::ClosingSquare;
+                        }
+                        // )
+                        else {
+                            println!("found )");
+                            typ = BracketType::ClosingRound;
+                        }
+                    }
+                    println!("rect = {:?}", self.rect());
+
+                    let (upper_glyph, lower_glyph) = self.divide_glyph_horizontaly()?;
+
+                    println!(
+                        "cap 1 = {}, cap 2 = {}",
+                        upper_glyph.image.capacity(),
+                        lower_glyph.image.capacity()
+                    );
+                    println!(
+                        "len 1 = {}, len 2 = {}",
+                        upper_glyph.image.len(),
+                        lower_glyph.image.len()
+                    );
+
+                    let dist = upper_glyph.distance(&lower_glyph, 0, 100.0);
+                    println!("diff = {}", dist);
+
+                    return Ok(match typ {
+                        BracketType::ClosingRound | BracketType::ClosingSquare => {
+                            if dist < DIST_THRESHOLD {
+                                Some(typ)
+                            } else {
+                                None
+                            }
+                        }
+                        BracketType::ClosingCurly => {
+                            if dist < 40.0 {
+                                Some(typ)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    });
+                }
+            }
+            // detect ( / { / [
+            else if right_top_corner != &255
+                && right_bottom_corner != &255
+                && img.get(middle_index_left).is_some_and(|v| v != &255)
+            {
+                println!("{:?}", self.rect());
+                let lower_index = ((self.rect().height / 2 - DIFF) * self.rect().width) as usize;
+                let upper_index = ((self.rect().height / 2 + DIFF) * self.rect().width) as usize;
+                if let (Some(lower_middle), Some(upper_middle)) =
+                    (img.get(lower_index), img.get(upper_index))
+                {
+                    // by defaut OpeningCurly
+                    let mut typ = BracketType::OpeningCurly;
+                    // diff (
+                    if lower_middle != &255 && upper_middle != &255 {
+                        if left_top_corner != &255 && left_bottom_corner != &255 {
+                            typ = BracketType::OpeningSquare;
+                            println!("founf [");
+                        } else {
+                            typ = BracketType::OpeningRound;
+                            println!("found (");
+                        }
+                    } else {
+                        println!("found {{");
+                    }
+
+                    let (upper_glyph, lower_glyph) = self.divide_glyph_horizontaly()?;
+
+                    println!(
+                        "cap 1 = {}, cap 2 = {}",
+                        upper_glyph.image.capacity(),
+                        lower_glyph.image.capacity()
+                    );
+                    println!(
+                        "len 1 = {}, len 2 = {}",
+                        upper_glyph.image.len(),
+                        lower_glyph.image.len()
+                    );
+
+                    let dist = upper_glyph.distance(&lower_glyph, 0, 100.0);
+                    println!("diff = {}", dist);
+                    return Ok(match typ {
+                        BracketType::OpeningRound | BracketType::OpeningSquare => {
+                            if dist < DIST_THRESHOLD {
+                                Some(typ)
+                            } else {
+                                None
+                            }
+                        }
+                        BracketType::OpeningCurly => {
+                            if dist < 40.0 {
+                                Some(typ)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    });
+                }
+            }
+        }
+        return Ok(None);
+    }
+
+    fn divide_glyph_horizontaly(&self) -> Result<(UnknownGlyph, UnknownGlyph)> {
+        let rect = Rect::new(0, 0, self.rect().width, self.rect().height / 2);
+        let middle_index = ((self.rect().height / 2) * self.rect().width) as usize;
+        let mut upper_glyph = UnknownGlyph::default();
+        upper_glyph.rect = rect;
+        let mut lower_glyph = upper_glyph.clone();
+        upper_glyph.image = Vec::with_capacity(middle_index);
+        lower_glyph.image = Vec::with_capacity(middle_index);
+
+        upper_glyph
+            .image
+            .extend_from_slice(&self.image()[0..middle_index]);
+        for x in (((self.rect().height / 2) + (self.rect().height % 2))
+            ..=self.rect().height.saturating_add_signed(-1))
+            .map(|v| v * self.rect().width)
+            .rev()
+        {
+            lower_glyph
+                .image
+                .extend_from_slice(&self.image()[(x as usize)..((x + self.rect().width) as usize)]);
+        }
+        Ok((upper_glyph, lower_glyph))
+    }
 }
 
 type GlyphData = (String, Code, Size, Vec<Style>, Vec<String>, bool);
@@ -170,14 +376,14 @@ impl KnownGlyph {
     #[must_use]
     pub fn get_latex(
         &self,
-        prev: &Option<KnownGlyph>,
-        next: &Option<KnownGlyph>,
+        prev: Option<&KnownGlyph>,
+        next: Option<&KnownGlyph>,
         end: bool,
     ) -> String {
         Self::latex(
             &self.get_data(),
-            &prev.clone().map(|glyph| glyph.get_data()),
-            &next.clone().map(|glyph| glyph.get_data()),
+            &prev.map(|glyph| glyph.get_data()),
+            &next.map(|glyph| glyph.get_data()),
             end,
         )
     }
@@ -324,7 +530,7 @@ impl KnownGlyph {
 }
 
 /// A Glyph for which only the image is known
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct UnknownGlyph {
     pub rect: Rect,
     pub image: Vec<u8>,

@@ -89,7 +89,7 @@ impl Line {
 
     /// Get the LaTeX for a Line
     #[must_use]
-    pub fn get_latex(&self, prev: &Option<KnownGlyph>, next: &Option<KnownGlyph>) -> String {
+    pub fn get_latex(&self, prev: Option<&KnownGlyph>, next: Option<&KnownGlyph>) -> String {
         self.words
             .iter()
             .enumerate()
@@ -97,13 +97,13 @@ impl Line {
                 let prev = self
                     .words
                     .get(i - 1)
-                    .map_or(prev.clone(), Word::get_last_guess);
+                    .map_or(prev, |w| w.get_last_guess());
                 let next = self
                     .words
                     .get(i + 1)
-                    .map_or(next.clone(), Word::get_first_guess);
+                    .map_or(next, |w| w.get_first_guess());
 
-                word.get_latex(&prev, &next)
+                word.get_latex(prev, next)
             })
             .collect::<Vec<String>>()
             .join(" ")
