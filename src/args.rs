@@ -3,7 +3,7 @@ use clap::{arg, command, Parser};
 use std::path::PathBuf;
 
 /// Arguments the user can give when using pdf2latex to parse a pdf to a latex file
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 #[command(author, version, about)]
 pub struct MainArg {
     /// PDF to convert

@@ -7,7 +7,7 @@ use std::path::Path;
 use std::process::Command;
 use std::{collections::HashMap, hash::Hash};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BracketType {
     OpeningRound,  // (
     ClosingRound,  // )
@@ -15,6 +15,34 @@ pub enum BracketType {
     ClosingSquare, // ]
     OpeningCurly,  // {
     ClosingCurly,  // }
+}
+
+impl BracketType {
+    pub fn is_opening_bracket(&self) -> bool {
+        match self {
+            BracketType::OpeningRound | BracketType::OpeningCurly | BracketType::OpeningSquare => {
+                true
+            }
+            BracketType::ClosingSquare | BracketType::ClosingRound | BracketType::ClosingCurly => {
+                false
+            }
+        }
+    }
+
+    pub fn is_closing_bracket(&self) -> bool {
+        !self.is_opening_bracket()
+    }
+
+    pub fn get_opposit(&self) -> BracketType {
+        match self {
+            BracketType::OpeningRound => BracketType::ClosingRound,
+            BracketType::ClosingRound => BracketType::OpeningRound,
+            BracketType::OpeningSquare => BracketType::ClosingSquare,
+            BracketType::ClosingSquare => BracketType::OpeningSquare,
+            BracketType::OpeningCurly => BracketType::ClosingCurly,
+            BracketType::ClosingCurly => BracketType::OpeningCurly,
+        }
+    }
 }
 
 /// A Rectangle in 2D

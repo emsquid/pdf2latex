@@ -1,25 +1,132 @@
 use super::{code::Code, size::Size, style::Style};
+use crate::args::MainArg;
 use crate::fonts::FontBase;
+use crate::pdf::{Line, Page, Word};
 use crate::utils::{find_parts, flood_fill, BracketType, Rect};
 use anyhow::{anyhow, Result};
-use image::{DynamicImage, GenericImageView, GrayImage, Pixel, Rgb, RgbImage};
+use image::{
+    DynamicImage, GenericImage, GenericImageView, GrayImage, ImageBuffer, Pixel, Rgb, RgbImage,
+};
 use std::{collections::HashMap, process::Command};
 
 pub const DIST_UNALIGNED_THRESHOLD: f32 = 32.;
 pub const DIST_THRESHOLD: f32 = 4.;
 pub const CHAR_THRESHOLD: u8 = 75;
+pub const MATRIX_SPACING: u32 = 70;
+
+pub type BracketData = (UnknownGlyph, BracketType, usize, usize);
 
 #[derive(Clone)]
 pub struct Matrix {
     nb_col: u32,
     nb_line: u32,
-    values: Vec<u32>,
+    page: Page,
     bracket_type: BracketType,
 }
 
 impl Matrix {
+    pub fn from(
+        image: &DynamicImage,
+        bracket_type: BracketType,
+        matrix_spacing: Option<u32>,
+        fontbase: &FontBase,
+        args: &MainArg,
+    ) -> Matrix {
+        let mut page = Page::from(&image, matrix_spacing);
+        image.save("aa2.png");
+        let mut args = args.to_owned();
+        args.verbose = false;
+        page.guess(fontbase, &args);
+        println!("content matrix = {}", page.get_content());
+        // page.debug_image().save("aa1.png");
+        let gl = &page.lines[1].words[0].glyphs[1];
+        println!("{:?}", gl.dist);
+        println!("{:?}", gl.rect);
+        image
+            .view(gl.rect.x, gl.rect.y, gl.rect.width, gl.rect.height)
+            .to_image()
+            .save("aa1.png");
+        // DynamicImage::;
+
+        // let a  = image::load_from_memory_with_format(&gl.image, image::ImageFormat::Png).unwrap();
+        // DynamicImage::from(ImageBuffer::from_raw(image.width(), image.height(), gl.image).unwrap()).save("aa1.png");
+        let cols_indexes = find_parts(
+            &image.rotate90().to_luma8(),
+            matrix_spacing.unwrap_or(MATRIX_SPACING),
+        );
+        // println!("{:?}", cols_indexes);
+        let mut indexes_to_pop: Vec<usize> = Vec::new();
+        let mut empty_words_to_push: Vec<usize> = Vec::new();
+        let mut went_inside;
+        let mut wi;
+        for li in 0..page.lines.len() {
+            indexes_to_pop.clear();
+            empty_words_to_push.clear();
+            // previous_col_index = std::usize::MAX;
+            let line = page.lines.get_mut(li).unwrap();
+            wi = 0;
+            for i in 0..cols_indexes.len() {
+                went_inside = false;
+                let col = cols_indexes.get(i).unwrap();
+                while line.words.get(wi).is_some_and(|word| word.is_between(&col)) {
+                    // join words they are at the same column
+                    if went_inside {
+                        let (inf, sup) = line.words.split_at_mut(wi);
+                        if let Some(last) = inf.last_mut() {
+                            last.join(&sup.first().unwrap());
+                        }
+                        indexes_to_pop.push(wi);
+                        wi += 1;
+                        continue;
+                    }
+                    wi += 1;
+                    went_inside = true;
+                }
+                if !went_inside {
+                    empty_words_to_push.push(i);
+                }
+            }
+            for i in indexes_to_pop.iter().rev() {
+                line.words.remove(*i);
+            }
+
+            for i in 0..empty_words_to_push.len() {
+                if empty_words_to_push[i] >= line.words.len() {
+                    for _ in i..empty_words_to_push.len() {
+                        line.words.push(Word::default());
+                    }
+                    break;
+                }
+                line.words
+                    .insert(empty_words_to_push[i] + i, Word::default());
+            }
+        }
+        Matrix {
+            nb_col: cols_indexes.len() as u32,
+            nb_line: page.lines.len() as u32,
+            page,
+            bracket_type,
+        }
+    }
     pub fn get_latex(&self) -> String {
-        return "".to_string();
+        let mut str = String::from("$\\begin{pmatrix}\n");
+
+        str += &self
+            .page
+            .lines
+            .iter()
+            .map(|line| {
+                line.words
+                    .iter()
+                    .map(|word| word.get_content())
+                    .collect::<Vec<String>>()
+                    .join(" & ")
+            })
+            .collect::<Vec<String>>()
+            .join("\\\\\n");
+
+        str += "\n\\end{pmatrix}";
+        str
     }
 }
 
@@ -176,32 +283,17 @@ pub trait Glyph {
                     if lower_middle != &255 && upper_middle != &255 {
                         // ]
                         if right_top_corner != &255 && right_bottom_corner != &255 {
-                            println!("found ]");
                             typ = BracketType::ClosingSquare;
                         }
                         // )
                         else {
-                            println!("found )");
                             typ = BracketType::ClosingRound;
                         }
                     }
-                    println!("rect = {:?}", self.rect());
 
                     let (upper_glyph, lower_glyph) = self.divide_glyph_horizontaly()?;
 
-                    println!(
-                        "cap 1 = {}, cap 2 = {}",
-                        upper_glyph.image.capacity(),
-                        lower_glyph.image.capacity()
-                    );
-                    println!(
-                        "len 1 = {}, len 2 = {}",
-                        upper_glyph.image.len(),
-                        lower_glyph.image.len()
-                    );
-
                     let dist = upper_glyph.distance(&lower_glyph, 0, 100.0);
-                    println!("diff = {}", dist);
 
                     return Ok(match typ {
                         BracketType::ClosingRound | BracketType::ClosingSquare => {
@@ -227,7 +319,6 @@ pub trait Glyph {
                 && right_bottom_corner != &255
                 && img.get(middle_index_left).is_some_and(|v| v != &255)
             {
-                println!("{:?}", self.rect());
                 let lower_index = ((self.rect().height / 2 - DIFF) * self.rect().width) as usize;
                 let upper_index = ((self.rect().height / 2 + DIFF) * self.rect().width) as usize;
                 if let (Some(lower_middle), Some(upper_middle)) =
@@ -239,30 +330,14 @@ pub trait Glyph {
                     if lower_middle != &255 && upper_middle != &255 {
                         if left_top_corner != &255 && left_bottom_corner != &255 {
                             typ = BracketType::OpeningSquare;
-                            println!("founf [");
                         } else {
                             typ = BracketType::OpeningRound;
-                            println!("found (");
                         }
-                    } else {
-                        println!("found {{");
                     }
 
                     let (upper_glyph, lower_glyph) = self.divide_glyph_horizontaly()?;
 
-                    println!(
-                        "cap 1 = {}, cap 2 = {}",
-                        upper_glyph.image.capacity(),
-                        lower_glyph.image.capacity()
-                    );
-                    println!(
-                        "len 1 = {}, len 2 = {}",
-                        upper_glyph.image.len(),
-                        lower_glyph.image.len()
-                    );
-
                     let dist = upper_glyph.distance(&lower_glyph, 0, 100.0);
-                    println!("diff = {}", dist);
                     return Ok(match typ {
                         BracketType::OpeningRound | BracketType::OpeningSquare => {
                             if dist < DIST_THRESHOLD {
@@ -623,6 +698,7 @@ impl UnknownGlyph {
 
     /// Try to find the closest `KnownGlyph` to this `UnknownGlyph` in a `FontBase`
     pub fn try_guess(&mut self, fontbase: &FontBase, baseline: u32, aligned: bool) {
+        println!();
         let mut closest = self.dist.unwrap_or(f32::INFINITY);
         let mut current_guess: Option<&KnownGlyph> = None;
         'outer: for family in fontbase.glyphs.values() {
@@ -639,6 +715,11 @@ impl UnknownGlyph {
                             let dist =
                                 self.distance(glyph, if aligned { offset } else { 0 }, closest)
                                     + if aligned { 0 } else { offset.abs() } as f32;
+                            if (width, height) == (30, 50) {
+                                if glyph.get_data().0 == "9" {
+                                    println!("dist on chec: {dist}, code = {}, current closest = {closest}, aligned = {aligned}, offsett = {offset}, gl.offset = {}, baseline = {baseline}", glyph.code, glyph.offset);
+                                }
+                            }
 
                             if dist < closest {
                                 closest = dist;
@@ -655,5 +736,8 @@ impl UnknownGlyph {
         }
         let _ = self.dist.insert(closest);
         self.guess = current_guess.cloned();
+        if current_guess.is_some_and(|v| v.get_data().0 == "u") {
+            // println!("found 2");
+        }
     }
 }

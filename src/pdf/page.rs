@@ -1,11 +1,14 @@
 use crate::args::MainArg;
-use crate::fonts::glyph::SpecialFormulas;
-use crate::fonts::{glyph::Glyph, FontBase};
+use crate::fonts::glyph::MATRIX_SPACING;
+use crate::fonts::{
+    glyph::{BracketData, Glyph, Matrix, SpecialFormulas},
+    FontBase, UnknownGlyph, DIST_THRESHOLD,
+};
 use crate::pdf::{Line, Word};
-use crate::utils::{find_parts, log, most_frequent, Rect};
+use crate::utils::{find_parts, log, most_frequent, BracketType, Rect};
 use crate::vit::Model;
-use anyhow::Result;
-use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
+use anyhow::{anyhow, Result};
+use image::{imageops::overlay, DynamicImage, GenericImage, GenericImageView, Rgba};
 use std::{
     io::Write,
     sync::{Arc, Mutex},
@@ -15,6 +18,7 @@ use std::{
 const LINE_SPACING: u32 = 10;
 
 /// A Page from a Pdf, it holds an image and multiple lines
+#[derive(Clone)]
 pub struct Page {
     pub image: DynamicImage,
     pub lines: Vec<Line>,
@@ -23,20 +27,20 @@ pub struct Page {
 impl Page {
     /// Create a Page from an image
     #[must_use]
-    pub fn from(image: &DynamicImage) -> Page {
+    pub fn from(image: &DynamicImage, word_spacing: Option<u32>) -> Page {
         Page {
             image: image.clone(),
-            lines: Page::find_lines(image),
+            lines: Page::find_lines(image, word_spacing),
         }
     }
 
     /// Find the different lines in an image
-    fn find_lines(image: &DynamicImage) -> Vec<Line> {
+    fn find_lines(image: &DynamicImage, word_spacing: Option<u32>) -> Vec<Line> {
         find_parts(&image.to_luma8(), LINE_SPACING)
             .into_iter()
             .map(|(start, end)| {
                 let rect = Rect::new(0, start, image.width(), end - start + 1);
-                Line::from(rect, image)
+                Line::from(rect, image, word_spacing)
             })
             .collect()
     }
@@ -218,10 +222,11 @@ impl Page {
     }
 
     /// Clean the pdf, like removing trailing dashes
-    pub fn verify(&mut self, args: &MainArg) -> Result<()> {
+    pub fn verify(&mut self, args: &MainArg, fontbase: &FontBase) -> Result<()> {
         for i in 0..self.lines.len() {
             self.handle_trailing_dash_verify(i);
         }
+        self.handle_matrixes_verify(fontbase, args);
         self.handle_formulas_verify(args)?;
 
         // remove page number
@@ -232,8 +237,149 @@ impl Page {
         Ok(())
     }
 
-    pub fn handle_matrix_verify(&mut self) {
+    pub fn handle_matrix_verify(
+        &self,
+        fontbase: &FontBase,
+        args: &MainArg,
+        bracket_opening: &BracketData,
+        bracket_closing: &BracketData,
+    ) -> Option<Matrix> {
+        let (rect_bo, rect_bc) = (bracket_opening.0.rect, bracket_closing.0.rect);
+        if (rect_bo.height).abs_diff(rect_bc.height) > 10 {
+            return None;
+        }
+        let matrix_width = rect_bc.x.abs_diff(rect_bo.x + rect_bo.width);
+        let matrix_height = std::cmp::min(rect_bc.y, rect_bo.y).abs_diff(std::cmp::min(
+            rect_bo.y + rect_bo.height,
+            rect_bc.y + rect_bc.height,
+        ));
+        let image = self.image.view(
+            rect_bo.x + rect_bo.width,
+            std::cmp::max(rect_bo.y, rect_bc.y),
+            matrix_width,
+            matrix_height,
+        );
 
+        let matrix_inside_image = DynamicImage::from(image.to_image());
+        // TODO if matrix in matrix
+        let matrix = Matrix::from(
+            &matrix_inside_image,
+            bracket_opening.1.clone(),
+            Some(MATRIX_SPACING),
+            fontbase,
+            args,
+        );
+        Some(matrix)
+    }
+
+    pub fn handle_matrixes_verify(&mut self, fontbase: &FontBase, args: &MainArg) -> Result<()> {
+        let mut brackets: Vec<BracketData>;
+        let mut matrixes_to_push: Vec<(usize, Matrix)> = Vec::new();
+        let mut glyphs_to_pop: Vec<((usize, usize), (usize, usize))> = Vec::new();
+        let mut c: usize;
+        for li in 0..self.lines.len() {
+            matrixes_to_push.clear();
+            glyphs_to_pop.clear();
+            let line = self.lines.get(li).unwrap();
+            c = 0;
+            brackets = line.get_all_brackets()?;
+            println!(
+                "al brackets = {:?}",
+                brackets.iter().map(|v| v.1.clone()).collect::<Vec<BracketType>>()
+            );
+            while c < brackets.len() {
+                let bc = &brackets[c];
+                if let Some(opposing) = line.search_opposing_brackets(bc, &brackets[c..]) {
+                    let bo = &brackets[opposing];
+                    if let Some(matrix) = self.handle_matrix_verify(fontbase, args, bc, bo) {
+                        println!("latex matrix = {}", matrix.get_latex());
+                        matrixes_to_push.push((bc.2 + 1, matrix));
+                        glyphs_to_pop.push(((bc.2, bc.3), (bo.2, bo.3)));
+                    } else { //TODO handle parentheses that does not match to a matrix
+                    }
+                    c = opposing;
+                } else {
+                    c += 1;
+                }
+            }
+            println!("to pop => {:?}", glyphs_to_pop);
+            let line = self.lines.get_mut(li).unwrap();
+            // TODO set rect CORRECTLY
+            for ((wi_f, gi_f), (wi_l, gi_l)) in glyphs_to_pop.iter().rev() {
+                // matrix has been detected in the same word
+                let mat = Some(SpecialFormulas::Matrix(matrixes_to_push.pop().unwrap().1));
+                if wi_f == wi_l {
+                    let word = line.words.get_mut(*wi_f).unwrap();
+                    // the matrix represents a full word
+                    if gi_f == &0 && *gi_l == word.glyphs.len() {
+                        word.glyphs.clear();
+                        word.glyphs.shrink_to_fit();
+                        word.special_formula = mat;
+                    }
+                    // the matrix is at the end of a word
+                    else if gi_l + 1 == word.glyphs.len() {
+                        word.glyphs.drain(gi_f + 1..);
+                        let mut w = Word::default();
+                        w.special_formula = mat;
+                        line.words.insert(wi_f.saturating_add_signed(-1), w);
+                    }
+                    // the matrix is at the start of a word
+                    else if gi_f == &0 {
+                        word.glyphs.drain(..gi_l);
+                        let mut w = Word::default();
+                        w.special_formula = mat;
+                        line.words.insert(*wi_f, w);
+                    }
+                    // matrix is between 2 words or an intersection of the 2
+                    else {
+                        let mut mat_added = false;
+                        let word_f = line.words.get_mut(*wi_f).unwrap();
+                        if *gi_f == 0 {
+                            mat_added = true;
+                            word_f.glyphs.clear();
+                            // TODO avoid this clone
+                            word_f.special_formula = mat.clone();
+                        } else {
+                            word_f.glyphs.drain(gi_f..);
+                        }
+
+                        let word_l = line.words.get_mut(*wi_l).unwrap();
+                        if *gi_l + 1 == word_l.glyphs.len() {
+                            if !mat_added {
+                                // TODO avoid this clone
+                                word_l.special_formula = mat.clone();
+                                word_l.glyphs.clear();
+                                mat_added = true;
+                            } else {
+                                line.words.remove(*wi_l);
+                            }
+                        } else {
+                            word_l.glyphs.drain(..gi_l);
+                        }
+
+                        line.words.drain(wi_f + 2..*wi_l);
+                        if mat_added {
+                            line.words.remove(wi_f + 1);
+                        } else {
+                            if wi_l.abs_diff(*wi_f) == 2 {
+                                let mut w = Word::default();
+                                w.special_formula = mat;
+                                line.words.insert(wi_f + 1, w);
+                            } else {
+                                let word_m = line.words.get_mut(*wi_f + 1).unwrap();
+                                word_m.glyphs.clear();
+                                word_m.special_formula = mat;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // for bracket in brackets.drain(0..) {
+        // if bracket.1 == BracketType::OpeningCurly {
+        // println!("maybe found system");
+        // }
+        Ok(())
     }
 
     pub fn handle_trailing_dash_verify(&mut self, line_index: usize) {

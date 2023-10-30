@@ -1,8 +1,8 @@
 use super::Page;
 use crate::args::MainArg;
-use crate::fonts::FontBase;
+use crate::fonts::{Code, FontBase, KnownGlyph};
 use crate::utils::{log, pdf_pages_number, pdf_to_images};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Ok, Result};
 use std::io::Write;
 
 /// A Pdf document represented as multiple pages
@@ -47,13 +47,32 @@ impl Pdf {
 
         // The FontBase is needed to compare glyphs
         let fontbase = FontBase::try_from(args)?;
+        // let mut a: Vec<(Code, (u32, u32))> = Vec::new();
+        // for i in fontbase.glyphs.into_iter() {
+        // for x in i.1 {
+        // for g in x.1 {
+        // if g.get_data().0 == "9" {
+        // a.push((i.0, x.0));
+        // }
+        // }
+        // }
+        // }
+        // println!("{:?}", a);
+        // return Ok(());
+        // let a = fontbase.glyphs.values().map(|v| {
+        // v.values().flat_map(|v| {
+        // v.iter()
+        // .filter(|v| v.get_data().0 == "2")
+        // .collect::<Vec<&KnownGlyph>>()
+        // })
+        // });
         self.pages = Vec::with_capacity(indexes.len());
 
         for i in indexes {
             self.pages.push(
                 pdf_to_images(&args.input, Some(&[i]))?
                     .get(0)
-                    .map(Page::from)
+                    .map(|v| Page::from(v, None))
                     .unwrap(),
             );
             let page = self.pages.last_mut().unwrap();
@@ -63,7 +82,7 @@ impl Pdf {
 
             page.guess(&fontbase, args)?;
         }
-        self.verify(args)?;
+        self.verify(args, &fontbase)?;
 
         if args.verbose {
             std::io::stdout().write_all(b"\n")?;
@@ -108,9 +127,9 @@ impl Pdf {
         self.pages.iter().map(Page::get_latex).collect()
     }
 
-    pub fn verify(&mut self, args: &MainArg) -> Result<()> {
+    pub fn verify(&mut self, args: &MainArg, fontbase: &FontBase) -> Result<()> {
         for page in self.pages.iter_mut() {
-            page.verify(args)?;
+            page.verify(args, fontbase)?;
         }
         Ok(())
     }

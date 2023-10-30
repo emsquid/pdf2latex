@@ -9,7 +9,7 @@ use image::DynamicImage;
 const WORD_SPACING: u32 = 15;
 
 /// A word from a Line from a Page from a Pdf
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Word {
     pub rect: Rect,
     pub glyphs: Vec<UnknownGlyph>,
@@ -191,5 +191,23 @@ impl Word {
         Ok(image
             .resize(image.width() / 2, image.height() / 2, FilterType::Lanczos3)
             .save(path)?)
+    }
+
+    pub fn is_between(&self, (start, end): &(u32, u32)) -> bool {
+        self.rect.x + 3 >= *start && self.rect.x + self.rect.width <= *end + 3
+    }
+
+    pub fn join(&mut self, other: &Word) {
+        // TODO DO THIS BETTER
+        self.glyphs.extend_from_slice(&other.glyphs);
+        if other
+            .glyphs
+            .last()
+            .is_some_and(|gl| gl.rect.x > self.rect.x)
+        {
+            let r = other.glyphs.last().unwrap().rect;
+            self.rect.x = r.x + r.width;
+        }
+        todo!()
     }
 }

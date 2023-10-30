@@ -1,12 +1,17 @@
 use super::Word;
+use crate::fonts::glyph::BracketData;
 use crate::fonts::FontBase;
+use crate::fonts::Glyph;
 use crate::fonts::KnownGlyph;
+use crate::fonts::DIST_THRESHOLD;
 use crate::utils::{find_parts, most_frequent, Rect};
+use anyhow::Result;
 use image::DynamicImage;
 
 const WORD_SPACING: u32 = 15;
 
 /// A Line from a Page from a Pdf
+#[derive(Clone)]
 pub struct Line {
     pub rect: Rect,
     pub baseline: u32,
@@ -18,8 +23,8 @@ pub struct Line {
 impl Line {
     /// Create a Line from the given rect and image
     #[must_use]
-    pub fn from(rect: Rect, image: &DynamicImage) -> Line {
-        let words = Self::find_words(rect, image);
+    pub fn from(rect: Rect, image: &DynamicImage, word_spacing: Option<u32>) -> Line {
+        let words = Self::find_words(rect, image, word_spacing);
         let baseline = Self::find_baseline(&words);
 
         Line {
@@ -31,14 +36,17 @@ impl Line {
     }
 
     /// Find the words in a Line based on its bounds
-    fn find_words(bounds: Rect, image: &DynamicImage) -> Vec<Word> {
-        find_parts(&bounds.crop(image).rotate90().to_luma8(), WORD_SPACING)
-            .into_iter()
-            .map(|(start, end)| {
-                let rect = Rect::new(bounds.x + start, bounds.y, end - start + 1, bounds.height);
-                Word::from(rect, image)
-            })
-            .collect()
+    fn find_words(bounds: Rect, image: &DynamicImage, word_spacing: Option<u32>) -> Vec<Word> {
+        find_parts(
+            &bounds.crop(image).rotate90().to_luma8(),
+            word_spacing.unwrap_or(WORD_SPACING),
+        )
+        .into_iter()
+        .map(|(start, end)| {
+            let rect = Rect::new(bounds.x + start, bounds.y, end - start + 1, bounds.height);
+            Word::from(rect, image)
+        })
+        .collect()
     }
 
     /// Find the baseline of the given words
@@ -94,14 +102,8 @@ impl Line {
             .iter()
             .enumerate()
             .map(|(i, word)| {
-                let prev = self
-                    .words
-                    .get(i - 1)
-                    .map_or(prev, |w| w.get_last_guess());
-                let next = self
-                    .words
-                    .get(i + 1)
-                    .map_or(next, |w| w.get_first_guess());
+                let prev = self.words.get(i - 1).map_or(prev, |w| w.get_last_guess());
+                let next = self.words.get(i + 1).map_or(next, |w| w.get_first_guess());
 
                 word.get_latex(prev, next)
             })
@@ -191,5 +193,43 @@ impl Line {
                 && (right_margin as i32 - page_margins.1 as i32).abs() < 50;
         }
         return false;
+    }
+
+    pub fn get_all_brackets(&self) -> Result<Vec<BracketData>> {
+        let mut brackets: Vec<BracketData> = Vec::new();
+        for (wi, word) in self.words.iter().enumerate() {
+            for (gi, glyph) in word.glyphs.iter().enumerate() {
+                if glyph.dist.is_some_and(|v| v > DIST_THRESHOLD) {
+                    if let Ok(Some(bracket_type)) = glyph.get_bracket_type() {
+                        // if bracket_type.is_opening_bracket() {
+                            // if bracket_type == BracketType::OpeningRound {
+                            // TODO avoid clone image
+                            brackets.push((glyph.clone(), bracket_type, wi, gi));
+                        // }
+                    }
+                }
+            }
+        }
+        Ok(brackets)
+    }
+
+    pub fn search_opposing_brackets(
+        &self,
+        data: &BracketData,
+        brackets: &[BracketData],
+    ) -> Option<usize> {
+        let dr = &data.0.rect;
+        let mut br: &Rect;
+        let opposing = data.1.get_opposit();
+        for (i, bracket) in brackets.iter().enumerate() {
+            br = &bracket.0.rect;
+            if bracket.1 == opposing
+                && br.height.abs_diff(dr.height) <= 10
+                && br.y.abs_diff(dr.y) <= 10
+            {
+                return Some(i);
+            }
+        }
+        None
     }
 }
