@@ -202,9 +202,9 @@ impl Line {
                 if glyph.dist.is_some_and(|v| v > DIST_THRESHOLD) {
                     if let Ok(Some(bracket_type)) = glyph.get_bracket_type() {
                         // if bracket_type.is_opening_bracket() {
-                            // if bracket_type == BracketType::OpeningRound {
-                            // TODO avoid clone image
-                            brackets.push((glyph.clone(), bracket_type, wi, gi));
+                        // if bracket_type == BracketType::OpeningRound {
+                        // TODO avoid clone image
+                        brackets.push((glyph.clone(), bracket_type, wi, gi));
                         // }
                     }
                 }

@@ -698,7 +698,6 @@ impl UnknownGlyph {
 
     /// Try to find the closest `KnownGlyph` to this `UnknownGlyph` in a `FontBase`
     pub fn try_guess(&mut self, fontbase: &FontBase, baseline: u32, aligned: bool) {
-        println!();
         let mut closest = self.dist.unwrap_or(f32::INFINITY);
         let mut current_guess: Option<&KnownGlyph> = None;
         'outer: for family in fontbase.glyphs.values() {
@@ -717,7 +716,7 @@ impl UnknownGlyph {
                                     + if aligned { 0 } else { offset.abs() } as f32;
                             if (width, height) == (30, 50) {
                                 if glyph.get_data().0 == "9" {
-                                    println!("dist on chec: {dist}, code = {}, current closest = {closest}, aligned = {aligned}, offsett = {offset}, gl.offset = {}, baseline = {baseline}", glyph.code, glyph.offset);
+                                    // println!("dist on check: {dist}, code = {}, current closest = {closest}, aligned = {aligned}, offset = {offset}, gl.offset = {}, baseline = {baseline}", glyph.code, glyph.offset);
                                 }
                             }
 

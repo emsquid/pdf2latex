@@ -236,7 +236,7 @@ pub fn flood_fill(start: Vec<(u32, u32)>, gray: &GrayImage, threshold: u8) -> Ve
 pub fn most_frequent<T: Hash + Eq + Copy>(array: &[T], default: T) -> (T, i32) {
     let mut hash_map = HashMap::new();
     for value in array {
-        hash_map.entry(value).and_modify(|v| *v += 1).or_insert(0);
+        hash_map.entry(value).and_modify(|v| *v += 1).or_insert(1);
     }
 
     let (mut mode, mut max): (T, i32) = (default, 0);

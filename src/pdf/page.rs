@@ -285,7 +285,10 @@ impl Page {
             brackets = line.get_all_brackets()?;
             println!(
                 "al brackets = {:?}",
-                brackets.iter().map(|v| v.1.clone()).collect::<Vec<BracketType>>()
+                brackets
+                    .iter()
+                    .map(|v| v.1.clone())
+                    .collect::<Vec<BracketType>>()
             );
             while c < brackets.len() {
                 let bc = &brackets[c];
