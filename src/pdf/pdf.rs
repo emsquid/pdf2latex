@@ -1,6 +1,6 @@
 use super::Page;
 use crate::args::MainArg;
-use crate::fonts::{Code, FontBase, KnownGlyph};
+use crate::fonts::FontBase;
 use crate::utils::{log, pdf_pages_number, pdf_to_images};
 use anyhow::{anyhow, Ok, Result};
 use std::io::Write;

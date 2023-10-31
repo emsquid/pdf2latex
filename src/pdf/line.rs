@@ -1,10 +1,9 @@
+use super::word::BracketData;
 use super::Word;
-use crate::fonts::glyph::BracketData;
-use crate::fonts::FontBase;
-use crate::fonts::Glyph;
-use crate::fonts::KnownGlyph;
-use crate::fonts::DIST_THRESHOLD;
-use crate::utils::{find_parts, most_frequent, Rect};
+use crate::{
+    fonts::{FontBase, Glyph, KnownGlyph, DIST_THRESHOLD},
+    utils::{find_parts, most_frequent, Rect},
+};
 use anyhow::Result;
 use image::DynamicImage;
 

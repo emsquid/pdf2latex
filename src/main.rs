@@ -1,11 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
-use pdf2latex::args::MainArg;
-use pdf2latex::latex::LaTeX;
-use pdf2latex::pdf::Pdf;
+use pdf2latex::{args::MainArg, latex::LaTeX, pdf::Pdf};
 
 /// Process the arguments given by the user
 fn process(args: &MainArg) -> Result<()> {
+    // std::env::set_var("RUST_BACKTRACE", "1");
     // Load the pdf
     // let mut pdf = Pdf::load(&args.input)?;
 

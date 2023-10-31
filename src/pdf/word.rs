@@ -1,13 +1,28 @@
-use crate::fonts::glyph::SpecialFormulas;
-use crate::fonts::FontBase;
-use crate::fonts::{Glyph, KnownGlyph, UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD};
-use crate::utils::Rect;
+use crate::fonts::{FontBase, Glyph, KnownGlyph, UnknownGlyph, CHAR_THRESHOLD, DIST_THRESHOLD};
+use crate::utils::{BracketType, Rect};
 use anyhow::Result;
-use image::imageops::FilterType;
-use image::DynamicImage;
+use image::{imageops::FilterType, DynamicImage};
+
+use super::Matrix;
 
 const WORD_SPACING: u32 = 15;
 
+pub type BracketData = (UnknownGlyph, BracketType, usize, usize);
+
+#[derive(Clone)]
+pub enum SpecialFormulas {
+    Matrix(Matrix),
+    GivenIaFormula(String),
+}
+
+impl SpecialFormulas {
+    pub fn get_latex(&self) -> String {
+        match self {
+            SpecialFormulas::Matrix(m) => m.get_latex(),
+            SpecialFormulas::GivenIaFormula(gia) => gia.to_owned(),
+        }
+    }
+}
 /// A word from a Line from a Page from a Pdf
 #[derive(Clone, Default)]
 pub struct Word {
@@ -208,6 +223,6 @@ impl Word {
             let r = other.glyphs.last().unwrap().rect;
             self.rect.x = r.x + r.width;
         }
-        todo!()
+        // todo!()
     }
 }

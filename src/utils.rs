@@ -1,11 +1,9 @@
 use anyhow::{anyhow, Result};
 use image::{DynamicImage, GrayImage};
 use regex::Regex;
-use std::cmp::Ordering;
-use std::io::Write;
-use std::path::Path;
-use std::process::Command;
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    cmp::Ordering, collections::HashMap, hash::Hash, io::Write, path::Path, process::Command,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BracketType {

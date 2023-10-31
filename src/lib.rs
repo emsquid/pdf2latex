@@ -4,11 +4,13 @@ pub mod utils;
 
 pub mod pdf {
     pub mod line;
+    pub mod matrix;
     pub mod page;
     pub mod pdf;
     pub mod word;
     // Reexport struct
     pub use line::Line;
+    pub use matrix::Matrix;
     pub use page::Page;
     pub use pdf::Pdf;
     pub use word::Word;
