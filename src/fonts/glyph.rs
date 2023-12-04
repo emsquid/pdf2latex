@@ -106,6 +106,7 @@ pub trait Glyph {
 
     fn get_bracket_type(&self) -> Result<Option<BracketType>> {
         if self.rect().width * 2 > self.rect().height {
+            // println!("exited for {:?}", self.rect());
             return Ok(None);
         }
         let img = &self.image();
@@ -161,7 +162,7 @@ pub trait Glyph {
 
                     return Ok(match typ {
                         BracketType::ClosingRound | BracketType::ClosingSquare => {
-                            if dist < DIST_THRESHOLD {
+                            if dist < 40.0 {
                                 Some(typ)
                             } else {
                                 None
@@ -202,9 +203,10 @@ pub trait Glyph {
                     let (upper_glyph, lower_glyph) = self.divide_glyph_horizontaly()?;
 
                     let dist = upper_glyph.distance(&lower_glyph, 0, 100.0);
+                    println!("dist = {} with rect = {:?}", dist, self.rect());
                     return Ok(match typ {
                         BracketType::OpeningRound | BracketType::OpeningSquare => {
-                            if dist < DIST_THRESHOLD {
+                            if dist < 40.0 {
                                 Some(typ)
                             } else {
                                 None

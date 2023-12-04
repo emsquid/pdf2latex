@@ -26,12 +26,21 @@ impl SpecialFormulas {
 /// A word from a Line from a Page from a Pdf
 #[derive(Clone, Default)]
 pub struct Word {
-    pub rect: Rect,
+    rect: Rect,
     pub glyphs: Vec<UnknownGlyph>,
     pub special_formula: Option<SpecialFormulas>,
 }
 
 impl Word {
+    pub fn rect(&self) -> &Rect {
+        match &self.special_formula {
+            Some(s) => match s {
+                SpecialFormulas::Matrix(m) => m.rect(),
+                _ => &self.rect,
+            },
+            None => &self.rect,
+        }
+    }
     /// Create a word from the given rect and image
     pub fn from(rect: Rect, image: &DynamicImage) -> Word {
         Word {
@@ -53,12 +62,12 @@ impl Word {
                 if gray[(x, y)].0[0] <= CHAR_THRESHOLD {
                     let glyph = UnknownGlyph::from((x, y), bounds, image);
                     // Remove black pixel which belongs to the glyph from the image
-                    for nx in 0..glyph.rect.width {
-                        for ny in 0..glyph.rect.height {
+                    for nx in 0..glyph.rect().width {
+                        for ny in 0..glyph.rect().height {
                             if glyph.get_pixel(nx, ny) < 1. {
                                 gray.put_pixel(
-                                    nx + glyph.rect.x - bounds.x,
-                                    ny + glyph.rect.y - bounds.y,
+                                    nx + glyph.rect().x - bounds.x,
+                                    ny + glyph.rect().y - bounds.y,
                                     image::Luma([255]),
                                 );
                             }
@@ -75,8 +84,8 @@ impl Word {
 
     /// Check if a glyph should be joined with others
     fn should_glyph_join(&self, index: usize) -> bool {
-        self.glyphs[index - 1].rect.x + self.glyphs[index - 1].rect.width - (WORD_SPACING / 4)
-            > self.glyphs[index].rect.x
+        self.glyphs[index - 1].rect().x + self.glyphs[index - 1].rect().width - (WORD_SPACING / 4)
+            > self.glyphs[index].rect().x
             || self.glyphs[index].dist.unwrap_or(f32::INFINITY) > DIST_THRESHOLD
     }
 
@@ -209,7 +218,7 @@ impl Word {
     }
 
     pub fn is_between(&self, (start, end): &(u32, u32)) -> bool {
-        self.rect.x + 3 >= *start && self.rect.x + self.rect.width <= *end + 3
+        self.rect().x + 3 >= *start && self.rect().x + self.rect().width <= *end + 3
     }
 
     pub fn join(&mut self, other: &Word) {
@@ -223,6 +232,5 @@ impl Word {
             let r = other.glyphs.last().unwrap().rect;
             self.rect.x = r.x + r.width;
         }
-        // todo!()
     }
 }

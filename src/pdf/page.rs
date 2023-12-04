@@ -1,6 +1,6 @@
 use crate::args::MainArg;
 use crate::fonts::Glyph;
-use crate::utils::{find_parts, log, most_frequent, Rect};
+use crate::utils::{find_parts, log, most_frequent, BracketType, Rect};
 use crate::vit::Model;
 use crate::{
     fonts::FontBase,
@@ -201,12 +201,12 @@ impl Page {
                     );
                 }
                 let sub =
-                    image::RgbaImage::from_pixel(word.rect.width, 2, Rgba([255, 100, 100, 255]));
+                    image::RgbaImage::from_pixel(word.rect().width, 2, Rgba([255, 100, 100, 255]));
 
                 overlay(
                     &mut copy,
                     &sub,
-                    i64::from(word.rect.x),
+                    i64::from(word.rect().x),
                     i64::from(unlock_line.rect.y + unlock_line.rect.height + 4),
                 );
             }
@@ -246,19 +246,33 @@ impl Page {
 
     pub fn handle_matrixes_verify(&mut self, fontbase: &FontBase, args: &MainArg) -> Result<()> {
         let mut brackets: Vec<BracketData>;
+        // word index
         let mut matrixes_to_push: Vec<(usize, Matrix)> = Vec::new();
+        //  ((wi_o, gi_c), (wi_o, gi_c))
         let mut brackets_to_remove: Vec<((usize, usize), (usize, usize))> = Vec::new();
         let mut c: usize;
+        println!("starting verify");
         for li in 0..self.lines.len() {
             matrixes_to_push.clear();
             brackets_to_remove.clear();
             let line = self.lines.get(li).unwrap();
             c = 0;
             brackets = line.get_all_brackets()?;
+            if li == 1 {
+                println!("bracket for line 1 with rect = {:?}", line.rect);
+            }
+            println!(
+                "all brackets = {:?}",
+                brackets
+                    .iter()
+                    .map(|v| v.1.to_owned())
+                    .collect::<Vec<BracketType>>()
+            );
             while c < brackets.len() {
                 let b_open = &brackets[c];
                 if let Some(opposing) = line.search_opposing_brackets(b_open, &brackets[c..]) {
                     let b_close = &brackets[opposing];
+
                     if let Ok(matrix) = Matrix::try_from(
                         &self.image,
                         (b_open, b_close),
@@ -271,6 +285,8 @@ impl Page {
                         brackets_to_remove.push(((b_open.2, b_open.3), (b_close.2, b_close.3)));
                     } else { //TODO handle parentheses that does not match to a matrix
                     }
+                    // pass all glyph that are inside the matrix, the matrix inside the matrix will
+                    // be handle by the matrix generation
                     c = opposing;
                 } else {
                     c += 1;
@@ -278,6 +294,7 @@ impl Page {
             }
             let line = self.lines.get_mut(li).unwrap();
             let mut removed;
+            let matrix_added = matrixes_to_push.len() > 0;
             for mut matrix in matrixes_to_push.drain(..) {
                 if let Some((bo, bc)) = brackets_to_remove.pop() {
                     line.words.get_mut(bo.0).unwrap().glyphs.remove(bo.1);
@@ -286,7 +303,7 @@ impl Page {
                 for wi in (0..line.words.len()).rev() {
                     removed = false;
                     let word = line.words.get_mut(wi).unwrap();
-                    if matrix.1.rect.contains(&word.rect) {
+                    if matrix.1.rect.contains(word.rect()) {
                         line.words.remove(wi);
                         removed = true;
                     } else {
@@ -304,10 +321,15 @@ impl Page {
                         matrix.0 -= 1;
                     }
                 }
-                // TODO set rect
                 let mut w = Word::default();
                 w.special_formula = Some(SpecialFormulas::Matrix(matrix.1));
+                println!("matrix inserted");
+                println!("len of line at add = {}", line.words.len());
                 line.words.insert(matrix.0, w);
+            }
+            if matrix_added {
+                line.baseline = Line::find_baseline(&line.words);
+                line.guess(fontbase);
             }
         }
         // for bracket in brackets.drain(0..) {

@@ -103,7 +103,7 @@ impl Pdf {
                     .iter()
                     .flat_map(|line| {
                         i += 1;
-                        line.words.get(0).map(|word| word.rect.x)
+                        line.words.get(0).map(|word| word.rect().x)
                     })
                     .min()
                     .unwrap_or(0)

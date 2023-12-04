@@ -41,13 +41,14 @@ impl Matrix {
             matrix_width,
             matrix_height,
         );
-        let matrix_image = image.view(matrix_rect.x, matrix_rect.y, matrix_width, matrix_height);
+        let matrix_image_view = image.view(matrix_rect.x, matrix_rect.y, matrix_width, matrix_height);
+        
 
         let mut matrix = Matrix {
             page: Page::default(),
             bracket_opening: (bracket_opening.1.to_owned(), bracket_opening.0.rect),
             bracket_closing: (bracket_closing.1.to_owned(), bracket_closing.0.rect),
-            image: DynamicImage::from(matrix_image.to_image()),
+            image: DynamicImage::from(matrix_image_view.to_image()),
             rect: matrix_rect,
         };
 
@@ -59,7 +60,9 @@ impl Matrix {
             matrix_inside_rect.height,
         );
         let matrix_inside_image = DynamicImage::from(matrix_inside_image_view.to_image());
+        // matrix_inside_image.save("matrix_inside.png");
 
+        // TODO some matrix are not rightly parsed... some lines a not parsed and seen as one word
         let mut page = Page::from(&matrix_inside_image, matrix_spacing);
         let mut args = args.to_owned();
         args.verbose = false;
@@ -79,15 +82,13 @@ impl Matrix {
         // collapse divided columns
         for li in 0..page.lines.len() {
             let line = page.lines.get_mut(li).unwrap();
-            if li == 4 {
-                let r = line.words[0].rect;
-                println!("{:?}", r);
-                DynamicImage::from(image.view(r.x, r.y, r.width, r.height).to_image())
-                    .save("aa3.png");
-            }
+            // if li == 4 {
+                let r = line.rect;
+                DynamicImage::from(matrix_inside_image.view(r.x, r.y, r.width, r.height).to_image())
+                    .save(format!("aa{}.png", li+5));
+            // }
             indexes_to_pop.clear();
             empty_words_to_push.clear();
-            // previous_col_index = std::usize::MAX;
             wi = 0;
             for i in 0..cols_indexes.len() {
                 went_inside = false;
@@ -138,9 +139,13 @@ impl Matrix {
             .lines
             .iter()
             .map(|line| {
+                println!("len = {}", line.words.len());
                 line.words
                     .iter()
-                    .map(|word| word.get_content())
+                    .map(|word| match &word.special_formula {
+                        Some(s) => s.get_latex(),
+                        None =>  word.get_content(),
+                    })
                     .collect::<Vec<String>>()
                     .join(" & ")
             })
@@ -171,5 +176,9 @@ impl Matrix {
             matrix_inside_width,
             matrix_inside_height,
         )
+    }
+
+    pub fn rect(&self) -> &Rect {
+        &self.rect
     }
 }

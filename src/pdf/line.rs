@@ -23,6 +23,7 @@ impl Line {
     /// Create a Line from the given rect and image
     #[must_use]
     pub fn from(rect: Rect, image: &DynamicImage, word_spacing: Option<u32>) -> Line {
+        println!("rect of line = {:?}", rect);
         let words = Self::find_words(rect, image, word_spacing);
         let baseline = Self::find_baseline(&words);
 
@@ -49,7 +50,7 @@ impl Line {
     }
 
     /// Find the baseline of the given words
-    fn find_baseline(words: &[Word]) -> u32 {
+    pub fn find_baseline(words: &[Word]) -> u32 {
         let bottoms = words
             .iter()
             .flat_map(|word| {
@@ -147,12 +148,12 @@ impl Line {
     pub fn get_bottom(&self) -> Option<u32> {
         self.words
             .iter()
-            .map(|word| word.rect.y + word.rect.height)
+            .map(|word| word.rect().y + word.rect().height)
             .min()
     }
 
     pub fn get_top(&self) -> Option<u32> {
-        self.words.iter().map(|word| word.rect.y).max()
+        self.words.iter().map(|word| word.rect().y).max()
     }
 
     pub fn search_words(&self, pattern: &str) -> Vec<usize> {
@@ -172,7 +173,7 @@ impl Line {
     pub fn pop_words_in_rect(&mut self, rect: &Rect) {
         let mut index_to_pop = Vec::new();
         for (i, word) in self.words.iter_mut().enumerate() {
-            if rect.contains(&word.rect) {
+            if rect.contains(word.rect()) {
                 index_to_pop.push(i);
             }
         }
