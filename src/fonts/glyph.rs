@@ -1,6 +1,9 @@
 use super::{code::Code, size::Size, style::Style};
-use crate::fonts::FontBase;
-use crate::utils::{find_parts, flood_fill, BracketType, Rect};
+use crate::{
+    fonts::FontBase,
+    pdf::line::LineData,
+    utils::{find_parts, flood_fill, BracketType, Rect},
+};
 use anyhow::{anyhow, Result};
 use image::{DynamicImage, GenericImageView, GrayImage, Pixel, Rgb, RgbImage};
 use std::{collections::HashMap, process::Command};
@@ -203,7 +206,6 @@ pub trait Glyph {
                     let (upper_glyph, lower_glyph) = self.divide_glyph_horizontaly()?;
 
                     let dist = upper_glyph.distance(&lower_glyph, 0, 100.0);
-                    println!("dist = {} with rect = {:?}", dist, self.rect());
                     return Ok(match typ {
                         BracketType::OpeningRound | BracketType::OpeningSquare => {
                             if dist < 40.0 {
@@ -317,14 +319,16 @@ impl KnownGlyph {
     #[must_use]
     pub fn get_latex(
         &self,
+        line_data: &LineData,
         prev: Option<&KnownGlyph>,
         next: Option<&KnownGlyph>,
         end: bool,
     ) -> String {
         Self::latex(
+            Some(line_data),
             &self.get_data(),
-            &prev.map(|glyph| glyph.get_data()),
-            &next.map(|glyph| glyph.get_data()),
+            prev.map(|glyph| glyph.get_data()).as_ref(),
+            next.map(|glyph| glyph.get_data()).as_ref(),
             end,
         )
     }
@@ -333,7 +337,7 @@ impl KnownGlyph {
     fn render(data: &GlyphData, id: usize) -> Result<(DynamicImage, i32)> {
         // Compute the LaTeX and write it to a file
         let code = data.1;
-        let latex = Self::latex(data, &None, &None, true);
+        let latex = Self::latex(None, data, None, None, true);
         let doc = format!(
             "\\documentclass[11pt, border=4pt]{{standalone}}
             \\usepackage{{amsmath, amssymb, amsthm}}
@@ -366,9 +370,10 @@ impl KnownGlyph {
 
     /// Create the LaTeX for some glyph data
     fn latex(
+        line_data: Option<&LineData>,
         data: &GlyphData,
-        prev: &Option<GlyphData>,
-        next: &Option<GlyphData>,
+        prev: Option<&GlyphData>,
+        next: Option<&GlyphData>,
         end: bool,
     ) -> String {
         let default = (
@@ -380,14 +385,13 @@ impl KnownGlyph {
             false,
         );
         let (base, _code, size, styles, modifiers, math) = &data;
-        let (_p_base, _p_code, p_size, p_styles, _p_modifiers, p_math) =
-            prev.as_ref().unwrap_or(&default);
-        let (_n_base, _n_code, n_size, n_styles, _n_modifiers, n_math) =
-            next.as_ref().unwrap_or(&default);
+        let is_math_middle_line = line_data.is_some_and(|l| l.is_math_middle_line);
+        let (_p_base, _p_code, p_size, p_styles, _p_modifiers, p_math) = prev.unwrap_or(&default);
+        let (_n_base, _n_code, n_size, n_styles, _n_modifiers, n_math) = next.unwrap_or(&default);
 
         let mut result = String::new();
 
-        if size != p_size || math != p_math || styles != p_styles {
+        if !is_math_middle_line && (size != p_size || math != p_math || styles != p_styles) {
             if size != &Size::Normalsize && !math {
                 result.push_str(&format!("{{\\{size} "));
             }
@@ -409,11 +413,11 @@ impl KnownGlyph {
                 .fold(base.clone(), |acc, modif| format!("\\{modif}{{{acc}}}")),
         );
 
-        if base.starts_with('\\') && *n_math && !end {
+        if !is_math_middle_line && base.starts_with('\\') && *n_math && !end {
             result.push(' ');
         }
 
-        if size != n_size || math != n_math || styles != n_styles {
+        if !is_math_middle_line && (size != n_size || math != n_math || styles != n_styles) {
             for &style in styles {
                 if style != Style::Normal {
                     result.push('}');

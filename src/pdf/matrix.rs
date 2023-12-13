@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use image::{DynamicImage, GenericImageView};
 
 use crate::{
@@ -21,6 +21,12 @@ pub struct Matrix {
 }
 
 impl Matrix {
+    /// generate a matrix from the given`image`, that muss include the given `brackets`, the column
+    /// will be parsed by the `matrix_spacing`
+    ///
+    /// # Error
+    ///
+    /// return an error if the page guess fails or if the the matrix is a one by one
     pub fn try_from(
         image: &DynamicImage,
         (bracket_opening, bracket_closing): (&BracketData, &BracketData),
@@ -30,6 +36,7 @@ impl Matrix {
     ) -> Result<Matrix> {
         let (rect_bo, rect_bc) = (bracket_opening.0.rect, bracket_closing.0.rect);
 
+        // compute the whole (with brackets) matrix inside to pe parsed
         let matrix_width = rect_bo.x.abs_diff(rect_bc.x + rect_bc.width);
         let matrix_height = std::cmp::min(rect_bc.y, rect_bo.y).abs_diff(std::cmp::max(
             rect_bo.y + rect_bo.height,
@@ -41,8 +48,8 @@ impl Matrix {
             matrix_width,
             matrix_height,
         );
-        let matrix_image_view = image.view(matrix_rect.x, matrix_rect.y, matrix_width, matrix_height);
-        
+        let matrix_image_view =
+            image.view(matrix_rect.x, matrix_rect.y, matrix_width, matrix_height);
 
         let mut matrix = Matrix {
             page: Page::default(),
@@ -52,6 +59,7 @@ impl Matrix {
             rect: matrix_rect,
         };
 
+        // compute the inside of the matrix (without brackets)
         let matrix_inside_rect = matrix.get_inside_rect();
         let matrix_inside_image_view = image.view(
             matrix_inside_rect.x,
@@ -60,7 +68,20 @@ impl Matrix {
             matrix_inside_rect.height,
         );
         let matrix_inside_image = DynamicImage::from(matrix_inside_image_view.to_image());
-        // matrix_inside_image.save("matrix_inside.png");
+
+        // find columns and lines
+        let cols_indexes = find_parts(
+            &matrix_inside_image.rotate90().to_luma8(),
+            matrix_spacing.unwrap_or(MATRIX_SPACING),
+        );
+        let lines_indexes = find_parts(
+            &matrix_inside_image.rotate90().to_luma8(),
+            matrix_spacing.unwrap_or(MATRIX_SPACING),
+        );
+
+        if lines_indexes.len() == 1 && cols_indexes.len() == 1 {
+            return Err(anyhow!("matrix of one item"));
+        }
 
         // TODO some matrix are not rightly parsed... some lines a not parsed and seen as one word
         let mut page = Page::from(&matrix_inside_image, matrix_spacing);
@@ -68,69 +89,59 @@ impl Matrix {
         args.verbose = false;
         page.guess(fontbase, &args)?;
         page.verify(&args, fontbase)?;
-        // println!("content matrix = {}", page.get_content());
 
-        let cols_indexes = find_parts(
-            &matrix_inside_image.rotate90().to_luma8(),
-            matrix_spacing.unwrap_or(MATRIX_SPACING),
-        );
-        // println!("{:?}", cols_indexes);
-        let mut indexes_to_pop: Vec<usize> = Vec::new();
         let mut empty_words_to_push: Vec<usize> = Vec::new();
-        let mut went_inside;
+        let mut first_of_part;
         let mut wi;
+        let mut word_in_col;
         // collapse divided columns
         for li in 0..page.lines.len() {
             let line = page.lines.get_mut(li).unwrap();
-            // if li == 4 {
-                let r = line.rect;
-                DynamicImage::from(matrix_inside_image.view(r.x, r.y, r.width, r.height).to_image())
-                    .save(format!("aa{}.png", li+5));
-            // }
-            indexes_to_pop.clear();
             empty_words_to_push.clear();
             wi = 0;
             for i in 0..cols_indexes.len() {
-                went_inside = false;
+                first_of_part = true;
+                word_in_col = false;
                 let col = cols_indexes.get(i).unwrap();
+                // find the first and the next ones of a column
                 while line.words.get(wi).is_some_and(|word| word.is_between(&col)) {
                     // join words they are at the same column
-                    if went_inside {
+                    if !first_of_part {
                         let (inf, sup) = line.words.split_at_mut(wi);
                         if let Some(last) = inf.last_mut() {
-                            last.join(&sup.first().unwrap());
+                            last.join(sup.first().unwrap());
+                            line.words.remove(wi);
                         }
-                        indexes_to_pop.push(wi);
+                        // indexes_to_pop.push(wi);
+                    } else {
                         wi += 1;
-                        continue;
                     }
-                    wi += 1;
-                    went_inside = true;
                 }
-                if !went_inside {
-                    empty_words_to_push.push(i);
-                }
-            }
-            for i in indexes_to_pop.iter().rev() {
-                line.words.remove(*i);
-            }
-
-            for i in 0..empty_words_to_push.len() {
-                if empty_words_to_push[i] >= line.words.len() {
-                    for _ in i..empty_words_to_push.len() {
-                        line.words.push(Word::default());
-                    }
-                    break;
-                }
-                if empty_words_to_push[i] + i <= line.words.len() {
-                    line.words
-                        .insert(empty_words_to_push[i] + i, Word::default());
+                // did not found any word in the column so add a new word with the rect of the
+                // column in it
+                if !word_in_col {
+                    line.words.insert(
+                        i,
+                        Word::new(
+                            Rect::new(
+                                line.rect.x + col.0,
+                                line.rect.y,
+                                col.1 - col.0,
+                                line.rect.height,
+                            ),
+                            vec![],
+                            None,
+                        ),
+                    );
                 }
             }
         }
         matrix.page = page;
         Ok(matrix)
     }
+
+    /// generate the latex equivalent of this matrix in latex (word are written as get_content()
+    /// and not get_latex())
     pub fn get_latex(&self) -> String {
         let mut str = String::from("\\begin{pmatrix}\n");
 
@@ -144,7 +155,7 @@ impl Matrix {
                     .iter()
                     .map(|word| match &word.special_formula {
                         Some(s) => s.get_latex(),
-                        None =>  word.get_content(),
+                        None => word.get_content(),
                     })
                     .collect::<Vec<String>>()
                     .join(" & ")
@@ -156,6 +167,7 @@ impl Matrix {
         str
     }
 
+    /// return the inside rect of the matrix, without the brackets
     pub fn get_inside_rect(&self) -> Rect {
         let matrix_inside_width = self
             .bracket_closing

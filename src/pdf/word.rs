@@ -3,7 +3,7 @@ use crate::utils::{BracketType, Rect};
 use anyhow::Result;
 use image::{imageops::FilterType, DynamicImage};
 
-use super::Matrix;
+use super::{line::LineData, Matrix};
 
 const WORD_SPACING: u32 = 15;
 
@@ -32,6 +32,17 @@ pub struct Word {
 }
 
 impl Word {
+    pub fn new(
+        rect: Rect,
+        glyphs: Vec<UnknownGlyph>,
+        special_formula: Option<SpecialFormulas>,
+    ) -> Self {
+        Word {
+            rect,
+            glyphs,
+            special_formula,
+        }
+    }
     pub fn rect(&self) -> &Rect {
         match &self.special_formula {
             Some(s) => match s {
@@ -154,12 +165,13 @@ impl Word {
     /// Get the guess for the last glyph in a Word
     #[must_use]
     pub fn get_last_guess(&self) -> Option<&KnownGlyph> {
+        return self.glyphs.last().and_then(|g| g.guess.as_ref());
         // TODO: Temporary fix
-        if self.get_dist_sum() / (self.glyphs.len() as f32) < DIST_THRESHOLD * 4.0 {
-            self.glyphs.last().and_then(|glyph| glyph.guess.as_ref())
-        } else {
-            None
-        }
+        // if self.get_dist_sum() / (self.glyphs.len() as f32) < DIST_THRESHOLD * 4.0 {
+        // self.glyphs.last().and_then(|glyph| glyph.guess.as_ref())
+        // } else {
+        // None
+        // }
     }
 
     /// Get the content of a Word, mostly for debugging
@@ -176,7 +188,12 @@ impl Word {
 
     /// Get the LaTeX for a Word
     #[must_use]
-    pub fn get_latex(&self, prev: Option<&KnownGlyph>, next: Option<&KnownGlyph>) -> String {
+    pub fn get_latex(
+        &self,
+        line_data: &LineData,
+        prev: Option<&KnownGlyph>,
+        next: Option<&KnownGlyph>,
+    ) -> String {
         if let Some(special_formulas) = &self.special_formula {
             format!("$${}$$", special_formulas.get_latex())
         } else {
@@ -188,7 +205,7 @@ impl Word {
                     let next = self.glyphs.get(i + 1).map_or(next, |g| g.guess.as_ref());
 
                     glyph.guess.as_ref().map_or(String::from("?"), |g| {
-                        g.get_latex(prev, next, i == self.glyphs.len() - 1)
+                        g.get_latex(line_data, prev, next, i == self.glyphs.len() - 1)
                     })
                 })
                 .collect()

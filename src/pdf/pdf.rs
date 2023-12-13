@@ -47,28 +47,13 @@ impl Pdf {
 
         // The FontBase is needed to compare glyphs
         let fontbase = FontBase::try_from(args)?;
-        // let mut a: Vec<(Code, (u32, u32))> = Vec::new();
-        // for i in fontbase.glyphs.into_iter() {
-        // for x in i.1 {
-        // for g in x.1 {
-        // if g.get_data().0 == "9" {
-        // a.push((i.0, x.0));
-        // }
-        // }
-        // }
-        // }
-        // println!("{:?}", a);
-        // return Ok(());
-        // let a = fontbase.glyphs.values().map(|v| {
-        // v.values().flat_map(|v| {
-        // v.iter()
-        // .filter(|v| v.get_data().0 == "2")
-        // .collect::<Vec<&KnownGlyph>>()
-        // })
-        // });
         self.pages = Vec::with_capacity(indexes.len());
 
         for i in indexes {
+            if args.verbose {
+                log(&format!("\nPAGE {i}\n"), None, None, "1m")?;
+            }
+
             self.pages.push(
                 pdf_to_images(&args.input, Some(&[i]))?
                     .get(0)
@@ -76,9 +61,6 @@ impl Pdf {
                     .unwrap(),
             );
             let page = self.pages.last_mut().unwrap();
-            if args.verbose {
-                log(&format!("\nPAGE {i}\n"), None, None, "1m")?;
-            }
 
             page.guess(&fontbase, args)?;
         }

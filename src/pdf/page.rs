@@ -1,12 +1,11 @@
-use crate::args::MainArg;
-use crate::fonts::Glyph;
-use crate::utils::{find_parts, log, most_frequent, BracketType, Rect};
-use crate::vit::Model;
 use crate::{
-    fonts::FontBase,
+    args::MainArg,
+    fonts::{FontBase, Glyph},
     pdf::{Line, Word},
+    utils::{find_parts, log, Rect},
+    vit::Model,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use image::{imageops::overlay, DynamicImage, GenericImage, Rgba};
 use std::{
     io::Write,
@@ -14,9 +13,11 @@ use std::{
     time,
 };
 
-use super::matrix::MATRIX_SPACING;
-use super::word::{BracketData, SpecialFormulas};
-use super::Matrix;
+use super::{
+    matrix::MATRIX_SPACING,
+    word::{BracketData, SpecialFormulas},
+    Matrix,
+};
 
 const LINE_SPACING: u32 = 10;
 
@@ -132,11 +133,7 @@ impl Page {
                 } else {
                     ""
                 };
-                format!(
-                    "\n    {}{}",
-                    line.get_latex(prev.as_ref(), next.as_ref(),),
-                    newline
-                )
+                format!("\n    {}{}", line.get_latex(&self, prev, next), newline)
             })
             .collect()
     }
@@ -245,31 +242,26 @@ impl Page {
     }
 
     pub fn handle_matrixes_verify(&mut self, fontbase: &FontBase, args: &MainArg) -> Result<()> {
+        // word index (glyph, bracket_type, word_index, glyph_index)
         let mut brackets: Vec<BracketData>;
-        // word index
+        // (word_index, Matrix)
         let mut matrixes_to_push: Vec<(usize, Matrix)> = Vec::new();
         //  ((wi_o, gi_c), (wi_o, gi_c))
         let mut brackets_to_remove: Vec<((usize, usize), (usize, usize))> = Vec::new();
         let mut c: usize;
-        println!("starting verify");
         for li in 0..self.lines.len() {
             matrixes_to_push.clear();
             brackets_to_remove.clear();
             let line = self.lines.get(li).unwrap();
             c = 0;
             brackets = line.get_all_brackets()?;
-            if li == 1 {
-                println!("bracket for line 1 with rect = {:?}", line.rect);
-            }
-            println!(
-                "all brackets = {:?}",
-                brackets
-                    .iter()
-                    .map(|v| v.1.to_owned())
-                    .collect::<Vec<BracketType>>()
-            );
             while c < brackets.len() {
                 let b_open = &brackets[c];
+                if b_open.1.is_closing_bracket() {
+                    c += 1;
+                    continue;
+                }
+                // search opposing brackets
                 if let Some(opposing) = line.search_opposing_brackets(b_open, &brackets[c..]) {
                     let b_close = &brackets[opposing];
 
@@ -280,33 +272,39 @@ impl Page {
                         fontbase,
                         args,
                     ) {
-                        println!("latex matrix = {}", matrix.get_latex());
                         matrixes_to_push.push((b_open.2 + 1, matrix));
                         brackets_to_remove.push(((b_open.2, b_open.3), (b_close.2, b_close.3)));
-                    } else { //TODO handle parentheses that does not match to a matrix
+                    } else {
+                        //TODO handle parentheses that does not match to a matrix
+                        // println!("matrix error");
                     }
                     // pass all glyph that are inside the matrix, the matrix inside the matrix will
                     // be handle by the matrix generation
                     c = opposing;
                 } else {
+                    // println!("opposing bracket not found");
                     c += 1;
                 }
             }
             let line = self.lines.get_mut(li).unwrap();
             let mut removed;
             let matrix_added = matrixes_to_push.len() > 0;
+            // push matrixes
             for mut matrix in matrixes_to_push.drain(..) {
+                // remove brackets
                 if let Some((bo, bc)) = brackets_to_remove.pop() {
-                    line.words.get_mut(bo.0).unwrap().glyphs.remove(bo.1);
                     line.words.get_mut(bc.0).unwrap().glyphs.remove(bc.1);
+                    line.words.get_mut(bo.0).unwrap().glyphs.remove(bo.1);
                 }
                 for wi in (0..line.words.len()).rev() {
                     removed = false;
                     let word = line.words.get_mut(wi).unwrap();
+                    // check if word rect is in matrix rect
                     if matrix.1.rect.contains(word.rect()) {
                         line.words.remove(wi);
                         removed = true;
                     } else {
+                        // check if glyph in word not removed are in matrix rect
                         for gi in (0..word.glyphs.len()).rev() {
                             if matrix.1.rect.contains(&word.glyphs[gi].rect) {
                                 word.glyphs.remove(gi);
@@ -317,16 +315,17 @@ impl Page {
                             removed = true;
                         }
                     }
+                    // a previous word has been removed and it is before the matrix, decrement
+                    // word_index of matrix to be inserted int the right place
                     if removed && wi < matrix.0 {
                         matrix.0 -= 1;
                     }
                 }
                 let mut w = Word::default();
                 w.special_formula = Some(SpecialFormulas::Matrix(matrix.1));
-                println!("matrix inserted");
-                println!("len of line at add = {}", line.words.len());
                 line.words.insert(matrix.0, w);
             }
+            // reguess line because the matrix could have mislead the chars of line
             if matrix_added {
                 line.baseline = Line::find_baseline(&line.words);
                 line.guess(fontbase);
@@ -339,6 +338,7 @@ impl Page {
         Ok(())
     }
 
+    /// remove the dahs that is a the end of a line
     pub fn handle_trailing_dash_verify(&mut self, line_index: usize) {
         let current_line = self.lines.get_mut(line_index).unwrap();
         let last_word = current_line.words.last();
@@ -363,9 +363,10 @@ impl Page {
         }
     }
 
+    /// analyse middle line and pass them to a IA
     pub fn handle_formulas_verify(&mut self, args: &MainArg) -> Result<()> {
         let formula_indexes = self.get_middle_formula_indexes();
-        if formula_indexes.len() == 00 {
+        if formula_indexes.len() == 0 {
             return Ok(());
         }
         let nb_formula = &formula_indexes.len().to_owned();
@@ -376,6 +377,7 @@ impl Page {
         let margins = (self.get_left_margin_mode(), self.get_right_margin_mode());
 
         let mut lines_to_remove: Vec<u32> = Vec::new();
+        // words to push at the end, (line_index, Word)
         let lines_to_modify: Arc<Mutex<Vec<(usize, Word)>>> = Arc::new(Mutex::new(Vec::new()));
 
         if args.verbose {
@@ -393,7 +395,6 @@ impl Page {
             let mut handles = Vec::with_capacity(args.threads);
 
             for i in formula_indexes {
-                // println!("handling {}", i);
                 let current_line = self.lines.get(i).unwrap();
                 let line_margin = (
                     current_line.get_left_margin(),
@@ -401,33 +402,38 @@ impl Page {
                 );
 
                 if line_margin.1.is_some() && line_margin.0.is_some() {
-                    // println!("passed => {}", i);
+                    // get data required
                     let (prev_line_some, next_line_some) =
                         (self.lines.get(i - 1), self.lines.get(i + 1));
+                    let (mut changed_top, mut changed_bottom) = (false, false);
                     let mut y_top = prev_line_some.map(Line::get_bottom);
                     let mut y_bottom = next_line_some.map(Line::get_top);
 
-                    if prev_line_some.is_some() {
-                        let prev_line = prev_line_some.unwrap();
+                    // check if previous line does not have a lot of words and in case add them to
+                    // the current line
+                    if let Some(prev_line) = prev_line_some {
                         if let Some(line_margin) = prev_line.get_left_margin() {
-                            if (line_margin as i32 - margins.0 as i32).abs() > 10
+                            if line_margin.abs_diff(margins.0) > 10
                                 && prev_line.count_glyphes() < 20
                             {
                                 lines_to_remove.push(i as u32 - 1);
                                 let _ = y_top.insert(prev_line.get_top());
+                                changed_top = true;
                             }
                         }
                     }
 
-                    if next_line_some.is_some() {
-                        let next_line = next_line_some.unwrap();
+                    // check if the next line does not have many words and in case add them to the
+                    //current line
+                    if let Some(next_line) = next_line_some {
                         if let Some(line_margin) = next_line.get_left_margin() {
                             if i + 2 != self.lines.len()
-                                && (line_margin as i32 - margins.0 as i32).abs() > 10
+                                && line_margin.abs_diff(margins.0) > 10
                                 && next_line.count_glyphes() < 20
                             {
                                 lines_to_remove.push(i as u32 + 1);
                                 let _ = y_bottom.insert(next_line.get_bottom());
+                                changed_bottom = true;
                             }
                         }
                     }
@@ -438,7 +444,6 @@ impl Page {
                         let lines_to_modify_cloned = lines_to_modify.clone();
                         let count_cloned = formula_id.to_owned();
                         let formula_done_cloned = formula_done.clone();
-                        // println!("strating thread => {}", i);
 
                         let handle = scope.spawn(move || -> Result<()> {
                             let rect = Rect::new(
@@ -465,7 +470,7 @@ impl Page {
                                     "u",
                                 )?;
                             }
-                            extracted_image.save(format!("test{}.png", top))?;
+                            // extracted_image.save(format!("test{}.png", top))?;
                             let mut word = Word::from(rect, &image_page);
                             let _ = word
                                 .special_formula
@@ -476,15 +481,37 @@ impl Page {
                         formula_id += 1;
 
                         handles.push(handle);
-                        if handles.len() >= 2 {
+                        if handles.len() >= 1 {
                             // if handles.len() >= args.threads {
-                            handles.remove(0).join().unwrap().unwrap();
+                            if let Err(e) = handles.remove(0).join().unwrap() {
+                                match e.downcast_ref::<std::io::Error>() {
+                                    Some(e_) => match e_.kind() {
+                                        std::io::ErrorKind::NotFound => {
+                                            return Err(anyhow!("Python IA not found"));
+                                        }
+                                        _ => (),
+                                    },
+                                    None => (),
+                                }
+                                lines_to_modify.lock().unwrap().pop();
+
+                                if changed_top {
+                                    lines_to_remove.pop();
+                                }
+                                if changed_bottom {
+                                    lines_to_remove.pop();
+                                }
+
+                                println!("Erreur lors de la génération d'une formule {e}");
+                            }
                         }
                     }
                 }
             }
             for handle in handles {
-                handle.join().unwrap().unwrap();
+                if let Err(e) = handle.join().unwrap() {
+                    println!("Erreur lors de la génération d'une formule {e}");
+                }
             }
             Ok(())
         })?;
@@ -503,6 +530,7 @@ impl Page {
             std::io::stdout().flush()?;
         }
 
+        // modify the formulas and remove the line contentm while inserting the formula
         let len = lines_to_modify.lock().unwrap().len();
         for (line_index, word) in lines_to_modify.lock().unwrap().iter().take(len) {
             let line = self.lines.get_mut(*line_index).unwrap();
@@ -510,6 +538,7 @@ impl Page {
             line.words.push(word.to_owned());
         }
 
+        // remove lines that have been added to a formula
         lines_to_remove.reverse();
         for index in lines_to_remove {
             self.lines.remove(index as usize);
@@ -519,21 +548,13 @@ impl Page {
     }
 
     pub fn get_right_margin_mode(&self) -> u32 {
-        let right_margins = self
-            .lines
-            .iter()
-            .filter_map(Line::get_right_margin)
-            .collect::<Vec<u32>>();
-        most_frequent(&right_margins, 0).0
+        let right_margins = self.lines.iter().filter_map(Line::get_right_margin).max();
+        right_margins.unwrap_or(0)
     }
 
     pub fn get_left_margin_mode(&self) -> u32 {
-        let left_margins = self
-            .lines
-            .iter()
-            .filter_map(Line::get_left_margin)
-            .collect::<Vec<u32>>();
-        most_frequent(&left_margins, 0).0
+        let left_margins = self.lines.iter().filter_map(Line::get_left_margin).min();
+        left_margins.unwrap_or(0)
     }
 
     pub fn search_words(&self, pattern: &str) -> Vec<(usize, Vec<usize>)> {
@@ -544,20 +565,31 @@ impl Page {
             .collect()
     }
 
-    pub fn get_middle_formula_indexes(&self) -> Vec<usize> {
+    pub fn get_middle_lines(&self) -> Vec<usize> {
         let mut lines_vec = Vec::new();
         let margins = (self.get_left_margin_mode(), self.get_right_margin_mode());
         for (i, line) in self.lines.iter().enumerate() {
-            let line_margin = (line.get_left_margin(), line.get_right_margin());
-            if let (Some(left_margin), Some(right_margin)) = line_margin {
-                if margins.1 - right_margin < left_margin - margins.0 + 25
-                    && line.get_dist_sum() / (line.count_glyphes() as f32) > 10.
-                    && !line.is_full_line(margins)
-                {
-                    lines_vec.push(i);
-                }
+            if line.words.len() == 1 && line.words.first().unwrap().special_formula.is_some() {
+                continue;
+            }
+            if line.is_middle_line(&margins) {
+                lines_vec.push(i);
             }
         }
-        return lines_vec;
+        lines_vec
+    }
+
+    pub fn get_middle_formula_indexes(&self) -> Vec<usize> {
+        let mut lines_vec = self.get_middle_lines();
+        lines_vec.retain(|i| {
+            self.lines
+                .get(*i)
+                .is_some_and(|line| line.is_math_middle_line_undetected())
+        });
+        lines_vec
+    }
+
+    pub fn get_margins(&self) -> (u32, u32) {
+        (self.get_left_margin_mode(), self.get_right_margin_mode())
     }
 }
